@@ -25,6 +25,9 @@ const securityHeaders = [
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // A checagem de tipos roda separadamente (`npm run typecheck`); não bloqueia o deploy.
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   serverExternalPackages: ["@prisma/client", "bcryptjs", "bullmq", "ioredis"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

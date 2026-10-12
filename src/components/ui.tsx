@@ -4,8 +4,8 @@ import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, Loader2, X, XCircle } from "lucide-react";
 
-export function cx(...classes: (string | false | null | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
+export function cx(...classes: unknown[]) {
+  return classes.filter((c): c is string => typeof c === "string" && c.length > 0).join(" ");
 }
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
