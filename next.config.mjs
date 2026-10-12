@@ -28,6 +28,9 @@ const nextConfig = {
   // A checagem de tipos roda separadamente (`npm run typecheck`); não bloqueia o deploy.
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
+  // O middleware faz uma cópia do corpo da requisição; acima deste limite o upload
+  // chegaria truncado (PDFs de etiquetas com centenas de páginas passam de 20 MB).
+  experimental: { middlewareClientMaxBodySize: "80mb" },
   serverExternalPackages: ["@prisma/client", "bcryptjs", "bullmq", "ioredis"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

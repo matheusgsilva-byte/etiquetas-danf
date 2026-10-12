@@ -50,8 +50,8 @@ export interface AnalyzeOptions {
 }
 
 const INK_THRESHOLD = 235;
-const RENDER_MAX_SIDE_PX = 900;
-const THUMB_MAX_SIDE_PX = 360;
+const RENDER_MAX_SIDE_PX = 640;
+const THUMB_MAX_SIDE_PX = 320;
 
 function normalizeRotation(angle: number): 0 | 90 | 180 | 270 {
   const r = ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
@@ -241,6 +241,9 @@ async function analyzeLoaded(
         thumbnail: rendered?.thumbnail ?? null,
         blank: rendered?.blank ?? false,
       });
+      // Libera fontes e objetos em cache do pdf.js periodicamente: PDFs com
+      // fontes embutidas por página (comum em DANFEs) esgotariam a memória.
+      if (pdf && (i + 1) % 5 === 0) await pdf.cleanup().catch(() => undefined);
       await options.onPage?.(i + 1, pageCount);
     }
   } finally {

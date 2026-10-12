@@ -74,6 +74,12 @@ describe("marketplaces", () => {
     assert.equal(detectMarketplace("", "etiquetas_shein_0110.pdf").marketplace, "shein");
     assert.equal(detectMarketplace("Remetente: Loja X", "doc.pdf").marketplace, "outros");
   });
+  it("DANFE simplificada: chave de acesso e número da nota", () => {
+    const t = "UP19FGF26157 DANFE SIMPLIFICADA 1 Saida Série: 009 Número: 491562 Emissao: 09/10/2026 3526 1045 4071 5700 0174 5500 9000 4915 6211 6723 6620 DESTINATÁRIO: Cliente";
+    const ids = extractIdentifiers(t, "outros");
+    assert.equal(ids.orderId, "NF 491562-009");
+    assert.equal(ids.trackingCode, "NFE35261045407157000174550090004915621167236620");
+  });
   it("rastreio tem prioridade como chave de remessa", () => {
     const ids = extractIdentifiers("Pedido: 123456789 Objeto: OA123456789BR", "outros");
     assert.equal(ids.trackingCode, "OA123456789BR");

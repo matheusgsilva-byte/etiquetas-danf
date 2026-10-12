@@ -180,9 +180,29 @@ export interface Identifiers {
   trackingCode: string | null;
 }
 
+/** Chave de acesso da NF-e (44 dígitos, normalmente em blocos de 4) — identifica a nota de forma única. */
+export function extractNfeKey(text: string): string | null {
+  const m = text.replace(/\s+/g, " ").match(/\b(\d{4}(?: ?\d{4}){10})\b/);
+  if (!m) return null;
+  const digits = m[1].replace(/ /g, "");
+  return digits.length === 44 ? digits : null;
+}
+
 export function extractIdentifiers(text: string, marketplace: MarketplaceId): Identifiers {
   const def = getMarketplace(marketplace);
   const normalized = text.replace(/\s+/g, " ");
+  // DANFE / DANFE simplificada: a chave de acesso é a melhor chave de duplicidade,
+  // e o número da nota serve como identificador de ordenação.
+  if (/\bDANFE\b/i.test(normalized)) {
+    const key = extractNfeKey(normalized);
+    const nf = normalized.match(/N[úu]mero:?\s*(\d{1,9})/i);
+    const serie = normalized.match(/S[ée]rie:?\s*(\d{1,3})/i);
+    const ownOrder = firstCapture(normalized, def.orderPatterns);
+    return {
+      orderId: ownOrder ?? (nf ? `NF ${nf[1]}${serie ? "-" + serie[1] : ""}` : null),
+      trackingCode: firstCapture(normalized, def.trackingPatterns) ?? (key ? `NFE${key}` : null),
+    };
+  }
   const orderId =
     firstCapture(normalized, def.orderPatterns) ??
     (marketplace !== "outros" ? firstCapture(normalized, getMarketplace("outros").orderPatterns) : null);

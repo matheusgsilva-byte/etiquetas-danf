@@ -17,7 +17,7 @@ const isFinal = (job: Job) => job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
 const workers = [
   new Worker<AnalyzeJobData>(QUEUES.analyze, async (job) => processAnalyze(job.data.fileId, isFinal(job)), {
     connection,
-    concurrency: config.WORKER_CONCURRENCY * 2,
+    concurrency: config.WORKER_CONCURRENCY,
   }),
   new Worker<GenerateJobData>(QUEUES.generate, async (job) => processGenerate(job.data.jobId, isFinal(job)), {
     connection,
