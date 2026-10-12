@@ -1,0 +1,58 @@
+# Ambiente completo para testes locais ou um servidor único.
+#   cp .env.example .env   (ajuste APP_SECRET)
+#   docker compose up --build
+# Acesse http://localhost:3000
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: labelhub
+      POSTGRES_PASSWORD: labelhub
+      POSTGRES_DB: labelhub
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U labelhub"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+
+  migrate:
+    build: .
+    command: ["npx", "prisma", "migrate", "deploy"]
+    env_file: .env
+    environment: &common
+      DATABASE_URL: postgresql://labelhub:labelhub@postgres:5432/labelhub?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_DIR: /app/.storage
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  web:
+    build: .
+    env_file: .env
+    environment: *common
+    ports: ["3000:3000"]
+    volumes: [storage:/app/.storage]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+  worker:
+    build: .
+    command: ["npm", "run", "worker"]
+    env_file: .env
+    environment: *common
+    volumes: [storage:/app/.storage]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:

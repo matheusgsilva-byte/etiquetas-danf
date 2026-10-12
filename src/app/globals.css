@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/*
+ * Identidade visual: "papel térmico e fita de expedição".
+ * Fundo frio de papel, tinta azul-marinho, ação em ultramar e o amarelo da
+ * fita adesiva reservado para avisos (duplicidades, atenção).
+ */
+@theme {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --color-ink: #1b2433;
+  --color-ink-soft: #4a5568;
+  --color-ink-faint: #7b8696;
+  --color-paper: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-line: #dce1e8;
+  --color-line-strong: #c3cbd6;
+  --color-action: #2457f5;
+  --color-action-dark: #1a43c7;
+  --color-action-soft: #e8eeff;
+  --color-tape: #ffd43b;
+  --color-tape-soft: #fff6d1;
+  --color-tape-ink: #6b5200;
+  --color-ok: #127a4b;
+  --color-ok-soft: #e3f5ec;
+  --color-danger: #c42b2b;
+  --color-danger-soft: #fdeaea;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  /* Borda picotada da área de envio, como a lateral de um rolo de etiquetas. */
+  .perforated {
+    background-image: radial-gradient(circle at 50% 50%, var(--color-paper) 4px, transparent 4.5px);
+    background-size: 16px 16px;
+    background-repeat: repeat-y;
+  }
+  /* Faixa listrada da fita de expedição — usada só para chamar atenção. */
+  .tape-stripes {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--color-tape) 0 10px,
+      #ffe27a 10px 20px
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

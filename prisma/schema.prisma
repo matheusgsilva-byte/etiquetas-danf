@@ -1,0 +1,272 @@
+// LabelHub Cloud — modelo de dados (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BatchStatus {
+  DRAFT
+  ANALYZING
+  READY
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum FileStatus {
+  PENDING
+  ANALYZING
+  READY
+  ERROR
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum DuplicateType {
+  FILE
+  PAGE
+  SHIPMENT
+  HISTORY
+}
+
+enum DuplicateDecision {
+  PENDING
+  KEEP
+  REMOVE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  sessions    Session[]
+  resetTokens PasswordResetToken[]
+}
+
+model Organization {
+  id                           String   @id @default(cuid())
+  name                         String
+  plan                         PlanTier @default(FREE)
+  /// Dias que PDFs e arquivos enviados ficam guardados (limitado pelo plano).
+  retentionDays                Int      @default(7)
+  /// Apaga os PDFs de origem assim que o PDF unificado é gerado (minimização de dados).
+  deleteSourcesAfterGeneration Boolean  @default(false)
+  defaultSettings              Json?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  members  Membership[]
+  sessions Session[]
+  invites  Invite[]
+  batches  Batch[]
+  jobs     Job[]
+  audit    AuditLog[]
+}
+
+model Membership {
+  id        String       @id @default(cuid())
+  userId    String
+  orgId     String
+  role      MemberRole   @default(MEMBER)
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+}
+
+model Session {
+  id         String       @id @default(cuid())
+  tokenHash  String       @unique
+  userId     String
+  orgId      String
+  expiresAt  DateTime
+  createdAt  DateTime     @default(now())
+  lastSeenAt DateTime     @default(now())
+  userAgent  String?
+  ip         String?
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Invite {
+  id          String       @id @default(cuid())
+  orgId       String
+  email       String
+  role        MemberRole   @default(MEMBER)
+  tokenHash   String       @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+}
+
+model Batch {
+  id            String       @id @default(cuid())
+  orgId         String
+  createdById   String
+  name          String
+  status        BatchStatus  @default(DRAFT)
+  settings      Json
+  uploadCounter Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  files  SourceFile[]
+  labels Label[]
+  jobs   Job[]
+
+  @@index([orgId, createdAt])
+}
+
+model SourceFile {
+  id                String     @id @default(cuid())
+  batchId           String
+  orgId             String
+  originalName      String
+  sizeBytes         Int
+  sha256            String
+  storageKey        String
+  pageCount         Int?
+  status            FileStatus @default(PENDING)
+  error             String?
+  marketplace       String?
+  uploadIndex       Int
+  repaired          Boolean    @default(false)
+  duplicateOfFileId String?
+  analyzedAt        DateTime?
+  purgedAt          DateTime?
+  createdAt         DateTime   @default(now())
+  batch             Batch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  labels            Label[]
+
+  @@index([batchId])
+  @@index([orgId, createdAt])
+}
+
+model Label {
+  id                String             @id @default(cuid())
+  batchId           String
+  fileId            String
+  pageIndex         Int
+  widthPt           Float
+  heightPt          Float
+  rotation          Int
+  cropBox           Json
+  contentBox        Json?
+  marketplace       String
+  confidence        String
+  orderId           String?
+  trackingCode      String?
+  shipmentKey       String?
+  fingerprint       String?
+  thumbnailKey      String?
+  blank             Boolean            @default(false)
+  position          Int
+  /// Etiqueta fora do PDF final (decisão do usuário).
+  excluded          Boolean            @default(false)
+  duplicateType     DuplicateType?
+  duplicateOfId     String?
+  duplicateDecision DuplicateDecision?
+  createdAt         DateTime           @default(now())
+  batch             Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  file              SourceFile         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, pageIndex])
+  @@index([batchId, position])
+  @@index([shipmentKey])
+}
+
+model Job {
+  id                String       @id @default(cuid())
+  orgId             String
+  batchId           String
+  createdById       String
+  status            JobStatus    @default(QUEUED)
+  progress          Int          @default(0)
+  stage             String?
+  settings          Json
+  error             String?
+  outputKey         String?
+  outputName        String?
+  outputSize        Int?
+  pageCount         Int?
+  filesCount        Int          @default(0)
+  labelsIncluded    Int          @default(0)
+  labelsDiscarded   Int          @default(0)
+  marketplaceCounts Json?
+  warnings          Json?
+  durationMs        Int?
+  queuedAt          DateTime     @default(now())
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  expiresAt         DateTime?
+  deletedAt         DateTime?
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  batch             Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, queuedAt])
+  @@index([batchId])
+  @@index([status, expiresAt])
+}
+
+model AuditLog {
+  id        String       @id @default(cuid())
+  orgId     String
+  userId    String?
+  action    String
+  targetId  String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime     @default(now())
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt])
+}
