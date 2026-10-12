@@ -182,10 +182,31 @@ export interface Identifiers {
 
 /** Chave de acesso da NF-e (44 dígitos, normalmente em blocos de 4) — identifica a nota de forma única. */
 export function extractNfeKey(text: string): string | null {
-  const m = text.replace(/\s+/g, " ").match(/\b(\d{4}(?: ?\d{4}){10})\b/);
-  if (!m) return null;
-  const digits = m[1].replace(/ /g, "");
-  return digits.length === 44 ? digits : null;
+  const normalized = text.replace(/\s+/g, " ");
+  // Procura sequências de 44 dígitos (com ou sem espaços) e valida o dígito
+  // verificador (módulo 11), evitando confundir datas ou outros números vizinhos.
+  const candidates = normalized.match(/(?<![\d/])\d[\d ]{42,60}\d/g) ?? [];
+  for (const c of candidates) {
+    const digits = c.replace(/ /g, "");
+    for (let start = 0; start + 44 <= digits.length; start++) {
+      const key = digits.slice(start, start + 44);
+      if (isValidNfeKey(key)) return key;
+    }
+  }
+  return null;
+}
+
+function isValidNfeKey(key: string): boolean {
+  if (!/^\d{44}$/.test(key)) return false;
+  let sum = 0;
+  let weight = 2;
+  for (let i = 42; i >= 0; i--) {
+    sum += Number(key[i]) * weight;
+    weight = weight === 9 ? 2 : weight + 1;
+  }
+  const rest = sum % 11;
+  const dv = rest < 2 ? 0 : 11 - rest;
+  return dv === Number(key[43]);
 }
 
 export function extractIdentifiers(text: string, marketplace: MarketplaceId): Identifiers {
