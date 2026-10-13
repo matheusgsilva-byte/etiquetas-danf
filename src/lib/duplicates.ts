@@ -4,8 +4,9 @@
  * Tipos, em ordem de prioridade:
  *  - FILE:     o arquivo inteiro é idêntico (mesmo SHA-256) a outro do lote.
  *  - PAGE:     a página é visualmente idêntica a outra do lote.
- *  - SHIPMENT: mesmo código de rastreio (ou mesmo nº de pedido no mesmo marketplace).
- *  - HISTORY:  a mesma remessa já saiu em um PDF gerado anteriormente pela empresa.
+ *  - SHIPMENT: mesma chave de DANFE, mesmo código de rastreio (ou mesmo nº de
+ *              pedido no mesmo marketplace).
+ *  - HISTORY:  a mesma DANFE/remessa já saiu em um PDF gerado anteriormente pela empresa.
  *
  * A primeira ocorrência (ordem de upload) é considerada a original. Nada é
  * removido automaticamente: o resultado apenas marca as etiquetas para revisão.
@@ -28,11 +29,22 @@ export interface DupLabel {
 }
 
 export interface DupResult {
-  labels: Map<string, { type: DuplicateType; duplicateOfId: string | null }>;
+  labels: Map<string, { type: DuplicateType; duplicateOfId: string | null; note?: string }>;
   files: Map<string, string>; // fileId -> fileId original
 }
 
-export function detectDuplicates(files: DupFile[], labels: DupLabel[], historyKeys: Set<string>): DupResult {
+/** Chave da DANFE (prefixo "nfe:" na chave de remessa). */
+export const isNfeKey = (key: string | null | undefined) => !!key && key.startsWith("nfe:");
+
+/**
+ * historyKeys: chaves já impressas antes; no formato Map, o valor é o texto
+ * explicativo mostrado ao usuário (ex.: data da impressão anterior).
+ */
+export function detectDuplicates(
+  files: DupFile[],
+  labels: DupLabel[],
+  historyKeys: Set<string> | Map<string, string>,
+): DupResult {
   const result: DupResult = { labels: new Map(), files: new Map() };
   const fileOrder = new Map(files.map((f) => [f.id, f.uploadIndex]));
 
@@ -67,12 +79,17 @@ export function detectDuplicates(files: DupFile[], labels: DupLabel[], historyKe
     if (l.shipmentKey) {
       const first = seenShipment.get(l.shipmentKey);
       if (first) {
-        result.labels.set(l.id, { type: "SHIPMENT", duplicateOfId: first });
+        result.labels.set(l.id, {
+          type: "SHIPMENT",
+          duplicateOfId: first,
+          ...(isNfeKey(l.shipmentKey) ? { note: "Mesma chave de DANFE de outra etiqueta deste lote." } : {}),
+        });
         continue;
       }
       seenShipment.set(l.shipmentKey, l.id);
       if (historyKeys.has(l.shipmentKey)) {
-        result.labels.set(l.id, { type: "HISTORY", duplicateOfId: null });
+        const note = historyKeys instanceof Map ? historyKeys.get(l.shipmentKey) : undefined;
+        result.labels.set(l.id, { type: "HISTORY", duplicateOfId: null, ...(note ? { note } : {}) });
       }
     }
   }
@@ -89,6 +106,6 @@ export const DUPLICATE_LABELS: Record<DuplicateType, string> = {
 export const DUPLICATE_HELP: Record<DuplicateType, string> = {
   FILE: "O mesmo arquivo foi enviado mais de uma vez neste lote.",
   PAGE: "Esta página é visualmente idêntica a outra etiqueta do lote.",
-  SHIPMENT: "Outra etiqueta do lote tem o mesmo código de rastreio ou número de pedido.",
-  HISTORY: "Esta remessa já apareceu em um PDF unificado gerado anteriormente.",
+  SHIPMENT: "Outra etiqueta do lote tem a mesma chave de DANFE, código de rastreio ou número de pedido.",
+  HISTORY: "Esta DANFE (mesma chave de acesso) ou remessa já saiu em um PDF unificado gerado anteriormente.",
 };

@@ -81,6 +81,26 @@ describe("marketplaces", () => {
     assert.equal(ids.orderId, "NF 491562-009");
     assert.equal(ids.trackingCode, "NFE35261045407157000174550090004915621167236620");
   });
+  it("DANFE: a chave de acesso vale mais que o rastreio", () => {
+    const t = "DANFE SIMPLIFICADA Objeto: OA123456789BR 3526 1038 5016 7400 0142 5500 9000 3072 5219 3396 2296 Número: 307252 Série: 009";
+    const ids = extractIdentifiers(t, "outros");
+    assert.equal(ids.nfeKey, "35261038501674000142550090003072521933962296");
+    assert.equal(shipmentKey("outros", ids), "nfe:35261038501674000142550090003072521933962296");
+  });
+  it("DANFE repetida: no lote e no histórico, com explicação", () => {
+    const K = "nfe:35261038501674000142550090003072521933962296";
+    const f = [{ id: "x", sha256: "1", uploadIndex: 1 }, { id: "y", sha256: "2", uploadIndex: 2 }];
+    const l = [
+      { id: "x0", fileId: "x", pageIndex: 0, fingerprint: "a", shipmentKey: K, blank: false },
+      { id: "y0", fileId: "y", pageIndex: 0, fingerprint: "b", shipmentKey: K, blank: false },
+    ];
+    const inBatch = detectDuplicates(f, l, new Map());
+    assert.equal(inBatch.labels.get("y0")?.type, "SHIPMENT");
+    assert.match(inBatch.labels.get("y0")?.note ?? "", /chave de DANFE/);
+    const hist = detectDuplicates(f, l, new Map([[K, "DANFE já impressa em 13/10/2026 às 14:53 (Lote 1)."]]));
+    assert.deepEqual(hist.labels.get("x0"), { type: "HISTORY", duplicateOfId: null, note: "DANFE já impressa em 13/10/2026 às 14:53 (Lote 1)." });
+    assert.equal(hist.labels.get("y0")?.type, "SHIPMENT");
+  });
   it("rastreio tem prioridade como chave de remessa", () => {
     const ids = extractIdentifiers("Pedido: 123456789 Objeto: OA123456789BR", "outros");
     assert.equal(ids.trackingCode, "OA123456789BR");

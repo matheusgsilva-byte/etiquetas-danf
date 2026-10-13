@@ -110,6 +110,7 @@ function LabelCard({ label, sequence, sortable, locked, originalName, onToggle, 
             <Badge tone={pending ? "warn" : "neutral"} title={DUPLICATE_HELP[dup]}>
               {DUPLICATE_LABELS[dup]}
             </Badge>
+            {label.duplicateNote && <p className="text-xs font-medium text-tape-ink">{label.duplicateNote}</p>}
             {originalName && <p className="truncate text-xs text-ink-faint">Igual a: {originalName}</p>}
             {pending && !locked && (
               <div className="flex gap-1.5">

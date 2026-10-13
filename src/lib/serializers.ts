@@ -76,6 +76,7 @@ export function serializeLabel(l: Label, file: SourceFile) {
     duplicateType: l.duplicateType,
     duplicateOfId: l.duplicateOfId,
     duplicateDecision: l.duplicateDecision,
+    duplicateNote: l.duplicateNote ?? null,
     thumbnailUrl: l.thumbnailKey ? `/api/labels/${l.id}/thumbnail` : null,
   };
 }

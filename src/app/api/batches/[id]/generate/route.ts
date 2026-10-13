@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ApiError, json, parseBody, requireSession, route, type IdParams } from "@/lib/api";
 import { audit } from "@/lib/audit";
+import { recomputeDuplicates } from "@/lib/batch-service";
 import { db } from "@/lib/db";
 import { normalizeSettings, outputSettingsSchema } from "@/lib/output-settings";
 import { enqueueGenerate } from "@/lib/queue";
@@ -25,6 +26,10 @@ export const POST = route(async (req, { params }: IdParams) => {
 
   const purged = await db.sourceFile.count({ where: { batchId: id, status: "READY", purgedAt: { not: null } } });
   if (purged) throw new ApiError(410, "Os arquivos de origem deste lote já foram excluídos pela política de retenção.");
+
+  // Confere de novo o histórico: outro lote pode ter impresso as mesmas DANFEs
+  // depois que este foi analisado.
+  await recomputeDuplicates(id);
 
   const baseWhere = { batchId: id, file: { status: "READY" as const } };
   const pendingDuplicates = await db.label.count({

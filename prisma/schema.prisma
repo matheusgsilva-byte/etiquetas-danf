@@ -89,6 +89,7 @@ model Organization {
   batches  Batch[]
   jobs     Job[]
   audit    AuditLog[]
+  printedKeys PrintedKey[]
 }
 
 model Membership {
@@ -223,6 +224,8 @@ model Label {
   duplicateType     DuplicateType?
   duplicateOfId     String?
   duplicateDecision DuplicateDecision?
+  /// Detalhe da duplicidade mostrado ao usuário (ex.: quando a DANFE já foi impressa).
+  duplicateNote     String?
   createdAt         DateTime           @default(now())
   batch             Batch              @relation(fields: [batchId], references: [id], onDelete: Cascade)
   file              SourceFile         @relation(fields: [fileId], references: [id], onDelete: Cascade)
@@ -277,4 +280,18 @@ model AuditLog {
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId, createdAt])
+}
+
+/// Chaves de acesso de DANFE já impressas pela empresa. Fica fora dos lotes para
+/// que o controle de duplicidade continue valendo depois da limpeza de retenção.
+model PrintedKey {
+  orgId     String
+  key       String
+  batchId   String
+  batchName String
+  jobId     String
+  printedAt DateTime     @default(now())
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, key])
 }

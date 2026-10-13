@@ -9,6 +9,7 @@
  */
 import type { PDFDocument } from "pdf-lib";
 import { audit } from "../../lib/audit";
+import { recordPrintedKeys } from "../../lib/batch-service";
 import { db } from "../../lib/db";
 import { groupByMarketplace, sortLabels } from "../../lib/labels";
 import { marketplaceName } from "../../lib/marketplaces";
@@ -133,8 +134,8 @@ export async function processGenerate(jobId: string, isFinalAttempt: boolean) {
     for (const l of included) marketplaceCounts[l.marketplace] = (marketplaceCounts[l.marketplace] ?? 0) + 1;
     const finishedAt = new Date();
 
-    await db.$transaction([
-      db.job.update({
+    await db.$transaction(async (tx) => {
+      await tx.job.update({
         where: { id: jobId },
         data: {
           status: "COMPLETED",
@@ -153,9 +154,18 @@ export async function processGenerate(jobId: string, isFinalAttempt: boolean) {
           finishedAt,
           expiresAt: new Date(finishedAt.getTime() + job.org.retentionDays * 86_400_000),
         },
-      }),
-      db.batch.update({ where: { id: job.batchId }, data: { status: "COMPLETED" } }),
-    ]);
+      });
+      await tx.batch.update({ where: { id: job.batchId }, data: { status: "COMPLETED" } });
+      // DANFEs impressas: a partir de agora, a mesma chave aparece como duplicada em qualquer lote.
+      await recordPrintedKeys(tx, {
+        orgId: job.orgId,
+        batchId: job.batchId,
+        batchName: job.batch.name,
+        jobId,
+        printedAt: finishedAt,
+        keys: included.map((l) => l.shipmentKey).filter((k): k is string => !!k),
+      });
+    }, { timeout: 60_000 });
 
     await audit(job.orgId, job.createdById, "job.completed", job.id, {
       labels: result.labelCount,

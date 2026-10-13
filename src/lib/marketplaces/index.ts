@@ -178,6 +178,8 @@ function firstCapture(text: string, patterns: RegExp[]): string | null {
 export interface Identifiers {
   orderId: string | null;
   trackingCode: string | null;
+  /** Chave de acesso (44 dígitos) quando a página é uma DANFE. */
+  nfeKey?: string | null;
 }
 
 /** Chave de acesso da NF-e (44 dígitos, normalmente em blocos de 4) — identifica a nota de forma única. */
@@ -222,6 +224,7 @@ export function extractIdentifiers(text: string, marketplace: MarketplaceId): Id
     return {
       orderId: ownOrder ?? (nf ? `NF ${nf[1]}${serie ? "-" + serie[1] : ""}` : null),
       trackingCode: firstCapture(normalized, def.trackingPatterns) ?? (key ? `NFE${key}` : null),
+      nfeKey: key,
     };
   }
   const orderId =
@@ -233,6 +236,8 @@ export function extractIdentifiers(text: string, marketplace: MarketplaceId): Id
 
 /** Chave usada para identificar a mesma remessa em etiquetas diferentes. */
 export function shipmentKey(marketplace: string, ids: Identifiers): string | null {
+  // A chave da DANFE identifica a nota de forma única: vale mais que o rastreio.
+  if (ids.nfeKey) return `nfe:${ids.nfeKey}`;
   if (ids.trackingCode) return `trk:${ids.trackingCode}`;
   if (ids.orderId) return `ord:${marketplace}:${ids.orderId}`;
   return null;

@@ -65,8 +65,10 @@ Uma ressalva: quando uma palavra ocupa a linha inteira da coluna, não dá para 
 | --- | --- |
 | Arquivo repetido | mesmo SHA-256 de outro arquivo do lote |
 | Etiqueta idêntica | mesma impressão digital visual da página renderizada |
-| Mesma remessa | mesmo código de rastreio, ou mesmo nº de pedido no mesmo marketplace |
-| Já impressa antes | a remessa já saiu em um PDF gerado pela empresa nos últimos 60 dias |
+| Mesma remessa | mesma chave de acesso de DANFE, mesmo código de rastreio, ou mesmo nº de pedido no mesmo marketplace |
+| Já impressa antes | a DANFE (mesma chave de acesso) já saiu em qualquer PDF gerado pela empresa, sem limite de tempo; demais remessas, nos últimos 60 dias |
+
+**Chave da DANFE:** a chave de acesso de 44 dígitos (validada pelo dígito verificador) identifica a nota e tem prioridade sobre o rastreio. As chaves impressas ficam registradas à parte, então o controle continua valendo mesmo depois que a política de retenção apaga os lotes antigos. O cartão mostra quando e em qual lote a DANFE foi impressa. Ao clicar em gerar, o histórico é conferido de novo, pegando impressões feitas em outros lotes depois da análise.
 
 A primeira ocorrência (ordem de upload) é a original. Nada é removido automaticamente: cada duplicidade fica pendente até o usuário escolher **Manter** ou **Remover** (individualmente ou em lote). Se tentar gerar com pendências, o sistema pede confirmação. O PDF gerado registra quantas etiquetas foram mantidas e descartadas.
 
@@ -92,7 +94,7 @@ Proprietário, administradores e operadores. Administradores convidam por e-mail
 - **Cabeçalhos**: CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy.
 - **Criptografia em repouso** no S3 (SSE-AES256) quando usado com a AWS.
 - **Retenção configurável**: PDFs enviados, miniaturas e PDFs gerados são apagados automaticamente após o prazo; opção de apagar os PDFs de origem logo após gerar.
-- **Minimização**: o banco guarda apenas nº de pedido e rastreio (para duplicidades) — não guarda nomes nem endereços dos destinatários.
+- **Minimização**: o banco guarda apenas nº de pedido, rastreio e chave da DANFE (para duplicidades) — não guarda nomes nem endereços dos destinatários.
 - **Auditoria**: login, geração, download, visualização, exclusões e mudanças de configuração ficam em `AuditLog` (sem conteúdo das etiquetas).
 - **Eliminação**: o proprietário pode excluir a empresa com todos os arquivos e dados (tela Conta).
 

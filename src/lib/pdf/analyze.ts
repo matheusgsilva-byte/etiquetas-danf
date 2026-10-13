@@ -31,6 +31,8 @@ export interface PageAnalysis {
   confidence: "alta" | "media" | "baixa";
   orderId: string | null;
   trackingCode: string | null;
+  /** Chave de acesso da NF-e, quando a página é uma DANFE. */
+  nfeKey: string | null;
   /** SKU(s) impresso(s) na etiqueta, quando houver (vários separados por " | "). */
   sku: string | null;
   /** Descrição do produto impressa na etiqueta, quando houver. */
@@ -248,6 +250,7 @@ async function analyzeLoaded(
         confidence: detection.confidence,
         orderId: ids.orderId,
         trackingCode: ids.trackingCode,
+        nfeKey: ids.nfeKey ?? null,
         sku: extractSku(positioned, text),
         description: extractDescription(positioned, text),
         fingerprint,

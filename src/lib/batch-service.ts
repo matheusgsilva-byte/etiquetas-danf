@@ -3,10 +3,42 @@
  */
 import type { Prisma } from "@prisma/client";
 import { db } from "./db";
-import { detectDuplicates } from "./duplicates";
+import { detectDuplicates, isNfeKey } from "./duplicates";
 
 /** Janela em que uma remessa já impressa é considerada "repetida" (dias). */
 const HISTORY_WINDOW_DAYS = 60;
+
+const dateTimeFmt = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const formatDateTime = (d: Date) => dateTimeFmt.format(d).replace(",", " às");
+
+/**
+ * Registra as chaves de DANFE de um PDF gerado (a primeira impressão é mantida).
+ */
+export async function recordPrintedKeys(
+  tx: Prisma.TransactionClient,
+  data: { orgId: string; batchId: string; batchName: string; jobId: string; printedAt: Date; keys: string[] },
+) {
+  const keys = [...new Set(data.keys.filter(isNfeKey))];
+  if (!keys.length) return;
+  await tx.printedKey.createMany({
+    data: keys.map((key) => ({
+      orgId: data.orgId,
+      key,
+      batchId: data.batchId,
+      batchName: data.batchName,
+      jobId: data.jobId,
+      printedAt: data.printedAt,
+    })),
+    skipDuplicates: true,
+  });
+}
 
 /**
  * Recalcula as duplicidades do lote inteiro. Usa um lock consultivo do
@@ -37,17 +69,34 @@ export async function recomputeDuplicates(batchId: string) {
           duplicateType: true,
           duplicateOfId: true,
           duplicateDecision: true,
+          duplicateNote: true,
           excluded: true,
         },
       });
 
       const shipmentKeys = [...new Set(labels.map((l) => l.shipmentKey).filter((k): k is string => !!k))];
-      const historyKeys = new Set<string>();
-      if (shipmentKeys.length) {
+      const historyKeys = new Map<string, string>();
+
+      // DANFE: a mesma chave de acesso nunca pode sair duas vezes — histórico completo,
+      // guardado à parte para valer mesmo depois que os lotes antigos são apagados.
+      const nfeKeys = shipmentKeys.filter(isNfeKey);
+      if (nfeKeys.length) {
+        const printed = await tx.printedKey.findMany({
+          where: { orgId: batch.orgId, key: { in: nfeKeys }, batchId: { not: batchId } },
+          select: { key: true, batchName: true, printedAt: true },
+        });
+        for (const p of printed) {
+          historyKeys.set(p.key, `DANFE já impressa em ${formatDateTime(p.printedAt)} (${p.batchName}).`);
+        }
+      }
+
+      // Demais remessas (rastreio / nº do pedido): janela recente.
+      const otherKeys = shipmentKeys.filter((k) => !isNfeKey(k));
+      if (otherKeys.length) {
         const since = new Date(Date.now() - HISTORY_WINDOW_DAYS * 86_400_000);
         const previous = await tx.label.findMany({
           where: {
-            shipmentKey: { in: shipmentKeys },
+            shipmentKey: { in: otherKeys },
             batchId: { not: batchId },
             excluded: false,
             batch: { orgId: batch.orgId, jobs: { some: { status: "COMPLETED", finishedAt: { gte: since } } } },
@@ -55,7 +104,7 @@ export async function recomputeDuplicates(batchId: string) {
           select: { shipmentKey: true },
           distinct: ["shipmentKey"],
         });
-        previous.forEach((p) => p.shipmentKey && historyKeys.add(p.shipmentKey));
+        previous.forEach((p) => p.shipmentKey && historyKeys.set(p.shipmentKey, ""));
       }
 
       const result = detectDuplicates(files, labels, historyKeys);
@@ -71,11 +120,13 @@ export async function recomputeDuplicates(batchId: string) {
         const dup = result.labels.get(l.id);
         let data: Prisma.LabelUpdateInput | null = null;
         if (dup) {
-          if (dup.type !== l.duplicateType || dup.duplicateOfId !== l.duplicateOfId) {
+          const note = dup.note || null;
+          if (dup.type !== l.duplicateType || dup.duplicateOfId !== l.duplicateOfId || note !== l.duplicateNote) {
             const sameType = dup.type === l.duplicateType && l.duplicateDecision;
             data = {
               duplicateType: dup.type,
               duplicateOfId: dup.duplicateOfId,
+              duplicateNote: note,
               duplicateDecision: sameType ? l.duplicateDecision : "PENDING",
             };
           }
@@ -85,6 +136,7 @@ export async function recomputeDuplicates(batchId: string) {
           data = {
             duplicateType: null,
             duplicateOfId: null,
+            duplicateNote: null,
             duplicateDecision: null,
             excluded: l.duplicateDecision === "REMOVE" ? false : l.excluded,
           };

@@ -292,7 +292,11 @@ export function Workspace({
       setConfirmDup(null);
       await load(batchId, true);
     } catch (err) {
-      if (err instanceof ClientApiError && err.code === "DUPLICATES_PENDING") setConfirmDup(err.message);
+      if (err instanceof ClientApiError && err.code === "DUPLICATES_PENDING") {
+        setConfirmDup(err.message);
+        // Mostra as duplicidades que a conferência do histórico acabou de encontrar.
+        load(batchId, true);
+      }
       else toast((err as Error).message, "danger");
     } finally {
       setGenerating(false);
