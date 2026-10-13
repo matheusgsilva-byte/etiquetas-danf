@@ -1,6 +1,5 @@
 import { json, requireSession, route } from "@/lib/api";
 import { db } from "@/lib/db";
-import { planLimits } from "@/lib/plans";
 import { serializeJob } from "@/lib/serializers";
 import { getUsage } from "@/lib/usage";
 
@@ -75,6 +74,5 @@ export const GET = route(async (req) => {
     daily: [...daily.entries()].map(([date, labels]) => ({ date, labels })),
     recent: recent.map((j) => ({ ...serializeJob(j), batchName: j.batch.name })),
     usage,
-    limits: planLimits(s.org.plan),
   });
 });

@@ -4,7 +4,6 @@ import { audit } from "@/lib/audit";
 import { hashPassword, passwordProblem, sha256, verifyPassword } from "@/lib/auth/crypto";
 import { createSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { planLimits } from "@/lib/plans";
 
 const schema = z.object({
   token: z.string().min(10),
@@ -18,10 +17,6 @@ export const POST = route(async (req) => {
   const invite = await db.invite.findUnique({ where: { tokenHash: sha256(body.token) }, include: { org: true } });
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     throw new ApiError(400, "Convite inválido ou expirado. Peça um novo convite ao administrador.");
-  }
-  const members = await db.membership.count({ where: { orgId: invite.orgId } });
-  if (members >= planLimits(invite.org.plan).maxMembers) {
-    throw new ApiError(403, "A empresa atingiu o limite de usuários do plano.");
   }
 
   let user = await db.user.findUnique({ where: { email: invite.email } });

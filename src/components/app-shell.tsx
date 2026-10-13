@@ -37,12 +37,10 @@ function Brand() {
 export function AppShell({
   user,
   orgName,
-  planName,
   children,
 }: {
   user: { name: string; email: string };
   orgName: string;
-  planName: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -89,7 +87,7 @@ export function AppShell({
     <div className="border-t border-white/10 px-5 py-4 text-sm">
       <p className="truncate font-medium text-white">{orgName}</p>
       <p className="truncate text-white/60">
-        {user.name} · plano {planName}
+        {user.name}
       </p>
       <button
         type="button"

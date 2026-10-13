@@ -5,7 +5,6 @@ import { db } from "@/lib/db";
 import { normalizeSettings, outputSettingsSchema } from "@/lib/output-settings";
 import { enqueueGenerate } from "@/lib/queue";
 import { serializeJob } from "@/lib/serializers";
-import { assertMonthlyLabels } from "@/lib/usage";
 
 const schema = z.object({
   settings: outputSettingsSchema.partial().optional(),
@@ -42,7 +41,6 @@ export const POST = route(async (req, { params }: IdParams) => {
   const settings = normalizeSettings({ ...normalizeSettings(batch.settings), ...(body.settings ?? {}) });
   const included = await db.label.count({ where: { ...baseWhere, excluded: false } });
   if (!included) throw new ApiError(400, "Nenhuma etiqueta selecionada para gerar o PDF.");
-  await assertMonthlyLabels(s.org, included);
 
   const job = await db.$transaction(async (tx) => {
     if (pendingDuplicates) {

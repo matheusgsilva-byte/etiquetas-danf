@@ -8,7 +8,6 @@ import { Alert, ButtonLink, Card, cx, EmptyState, ProgressBar, Spinner } from "@
 import { api } from "@/lib/client/api";
 import { formatBytes, formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { getMarketplace } from "@/lib/marketplaces";
-import type { PlanLimits } from "@/lib/plans";
 import type { JobDto } from "@/lib/serializers";
 
 interface Dashboard {
@@ -28,7 +27,6 @@ interface Dashboard {
   daily: { date: string; labels: number }[];
   recent: (JobDto & { batchName: string })[];
   usage: { labelsThisMonth: number; storageBytes: number; members: number };
-  limits: PlanLimits;
 }
 
 function Metric({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -216,31 +214,22 @@ export default function DashboardPage() {
               )}
             </Card>
 
-            <Card title={`Uso do plano ${data.limits.name}`} actions={<ButtonLink href="/conta" variant="ghost" size="sm">Ver planos</ButtonLink>}>
-              <div className="space-y-4 text-sm">
-                <div>
-                  <div className="mb-1 flex justify-between">
-                    <span>Etiquetas neste mês</span>
-                    <span className="tabular-nums text-ink-soft">
-                      {formatNumber(data.usage.labelsThisMonth)} / {formatNumber(data.limits.monthlyLabels)}
-                    </span>
-                  </div>
-                  <ProgressBar value={(data.usage.labelsThisMonth / data.limits.monthlyLabels) * 100} />
+            <Card title="Uso neste mês">
+              <dl className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-ink-soft">Etiquetas unificadas</dt>
+                  <dd className="tabular-nums font-medium">{formatNumber(data.usage.labelsThisMonth)}</dd>
                 </div>
-                <div>
-                  <div className="mb-1 flex justify-between">
-                    <span>Armazenamento</span>
-                    <span className="tabular-nums text-ink-soft">
-                      {formatBytes(data.usage.storageBytes)} / {formatNumber(data.limits.storageMb)} MB
-                    </span>
-                  </div>
-                  <ProgressBar value={(data.usage.storageBytes / (data.limits.storageMb * 1024 * 1024)) * 100} />
+                <div className="flex justify-between">
+                  <dt className="text-ink-soft">Armazenamento em uso</dt>
+                  <dd className="tabular-nums font-medium">{formatBytes(data.usage.storageBytes)}</dd>
                 </div>
-                <p className="text-ink-faint">
-                  Até {data.limits.maxFilesPerBatch} arquivos e {formatNumber(data.limits.maxPagesPerBatch)} páginas por unificação. Arquivos guardados por até{" "}
-                  {data.limits.maxRetentionDays} dias.
-                </p>
-              </div>
+                <div className="flex justify-between">
+                  <dt className="text-ink-soft">Usuários</dt>
+                  <dd className="tabular-nums font-medium">{formatNumber(data.usage.members)}</dd>
+                </div>
+              </dl>
+              <p className="mt-4 text-sm text-ink-faint">Sem limites de etiquetas, arquivos ou usuários.</p>
             </Card>
           </div>
         </>

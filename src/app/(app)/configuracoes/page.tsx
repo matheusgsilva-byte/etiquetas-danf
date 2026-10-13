@@ -13,7 +13,7 @@ type Member = { id: string; role: string; createdAt: string; isYou: boolean; use
 type Invite = { id: string; email: string; role: string; expiresAt: string };
 const ROLE: Record<string, string> = { OWNER: "Proprietário", ADMIN: "Administrador", MEMBER: "Operador" };
 
-function Team({ canManage, maxMembers, planName }: { canManage: boolean; maxMembers: number; planName: string }) {
+function Team({ canManage }: { canManage: boolean }) {
   const toast = useToast();
   const [data, setData] = useState<{ members: Member[]; invites: Invite[] } | null>(null);
   const [email, setEmail] = useState("");
@@ -53,10 +53,9 @@ function Team({ canManage, maxMembers, planName }: { canManage: boolean; maxMemb
     }
   }
 
-  const used = (data?.members.length ?? 0) + (data?.invites.length ?? 0);
 
   return (
-    <Card title="Equipe" description={`${used} de ${maxMembers} usuário(s) no plano ${planName}.`}>
+    <Card title="Equipe" description="Convide quantas pessoas quiser; todos compartilham o mesmo histórico.">
       {!data ? (
         <Spinner />
       ) : (
@@ -210,7 +209,7 @@ export default function SettingsPage() {
                   id="retention"
                   type="range"
                   min={1}
-                  max={me.limits.maxRetentionDays}
+                  max={730}
                   value={retention}
                   onChange={(e) => setRetention(Number(e.target.value))}
                   disabled={!canManage}
@@ -218,7 +217,7 @@ export default function SettingsPage() {
                 />
                 <p className="mt-1 text-xs text-ink-faint">
                   Depois desse prazo, os PDFs enviados, as miniaturas e os PDFs gerados são excluídos automaticamente. O histórico mantém apenas os
-                  números da operação. Máximo do plano {me.limits.name}: {me.limits.maxRetentionDays} dias.
+                  números da operação.
                 </p>
               </div>
               <Toggle
@@ -239,7 +238,7 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          <Team canManage={canManage} maxMembers={me.limits.maxMembers} planName={me.limits.name} />
+          <Team canManage={canManage} />
         </div>
 
         <Card title="Impressão padrão" description="Usada ao iniciar cada nova unificação. Pode ser ajustada em cada lote.">

@@ -2,7 +2,8 @@
  * Job de geração do PDF unificado.
  *
  * O resultado só é marcado como concluído depois de: (1) o PDF ser montado,
- * (2) reaberto e validado (nº e tamanho de páginas) e (3) gravado e conferido
+ * (2) cada bloco reaberto e validado (nº e tamanho de páginas), (3) os blocos
+ * juntados e o total de páginas conferido e (4) o arquivo gravado e conferido
  * no armazenamento. Em caso de falha nada é publicado e o lote volta a ficar
  * disponível para nova tentativa.
  */
@@ -12,7 +13,11 @@ import { db } from "../../lib/db";
 import { groupByMarketplace, sortLabels } from "../../lib/labels";
 import { marketplaceName } from "../../lib/marketplaces";
 import { normalizeSettings } from "../../lib/output-settings";
-import { composeDocument, validateOutput, type ComposeEntry, type LabelEntry } from "../../lib/pdf/compose";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { composeToFile } from "../../lib/pdf/chunked";
+import type { ComposeEntry, LabelEntry } from "../../lib/pdf/compose";
 import type { Box } from "../../lib/pdf/layout";
 import { loadPdfForProcessing } from "../../lib/pdf/load";
 import { keys, storage } from "../../lib/storage";
@@ -31,6 +36,8 @@ export async function processGenerate(jobId: string, isFinalAttempt: boolean) {
   const started = Date.now();
   const settings = normalizeSettings(job.settings);
   let outputKey: string | null = null;
+  let tempDir: string | null = null;
+  let sourceDir: string | null = null;
 
   const setStage = (stage: string, progress: number) =>
     db.job.update({ where: { id: jobId }, data: { stage, progress: Math.min(99, Math.round(progress)) } });
@@ -82,34 +89,43 @@ export async function processGenerate(jobId: string, isFinalAttempt: boolean) {
     }
 
     const storageKeys = new Map(included.map((l) => [l.fileId, l.file.storageKey]));
-    const cache = new Map<string, PDFDocument>();
-    const loadSource = async (fileId: string) => {
-      const cached = cache.get(fileId);
-      if (cached) return cached;
-      const key = storageKeys.get(fileId);
-      if (!key) throw new Error("Arquivo de origem não encontrado.");
-      const bytes = await storage().get(key);
-      const { doc } = await loadPdfForProcessing(new Uint8Array(bytes));
-      cache.set(fileId, doc);
+    // Cada PDF de origem é baixado uma única vez para o disco; depois é reaberto
+    // de lá quando um bloco precisar dele (sem manter todos na memória).
+    sourceDir = await mkdtemp(path.join(os.tmpdir(), "labelhub-src-"));
+    const localFiles = new Map<string, string>();
+    const loadSource = async (fileId: string): Promise<PDFDocument> => {
+      let local = localFiles.get(fileId);
+      if (!local) {
+        const key = storageKeys.get(fileId);
+        if (!key) throw new Error("Arquivo de origem não encontrado.");
+        local = path.join(sourceDir!, `${fileId}.pdf`);
+        await writeFile(local, await storage().get(key));
+        localFiles.set(fileId, local);
+      }
+      const { doc } = await loadPdfForProcessing(new Uint8Array(await readFile(local)));
       return doc;
     };
 
     await setStage("Unificando etiquetas", 5);
-    const result = await composeDocument(entries, {
+    let lastPct = -1;
+    const result = await composeToFile(entries, {
       settings,
       loadSource,
       title: job.batch.name,
-      onProgress: (done, total) => setStage(`Unificando etiquetas (${done}/${total})`, 5 + (done / total) * 80).then(() => undefined),
+      onProgress: async (done, total) => {
+        const pct = Math.floor((done / total) * 80);
+        if (pct === lastPct) return;
+        lastPct = pct;
+        await setStage(`Unificando etiquetas (${done}/${total})`, 5 + pct);
+      },
     });
+    tempDir = result.dir;
 
-    await setStage("Validando o PDF gerado", 88);
-    await validateOutput(result.bytes, result);
-
-    await setStage("Salvando arquivo", 93);
+    await setStage("Salvando arquivo", 92);
     outputKey = keys.output(job.orgId, job.id);
-    await storage().put(outputKey, result.bytes, "application/pdf");
+    await storage().putFile(outputKey, result.file, "application/pdf");
     const stored = await storage().head(outputKey);
-    if (!stored || stored.size !== result.bytes.length) {
+    if (!stored || stored.size !== result.size) {
       throw new Error("O arquivo gerado não foi gravado corretamente no armazenamento.");
     }
 
@@ -126,7 +142,7 @@ export async function processGenerate(jobId: string, isFinalAttempt: boolean) {
           stage: "Concluído",
           outputKey,
           outputName: outputFileName(finishedAt, result.labelCount),
-          outputSize: result.bytes.length,
+          outputSize: result.size,
           pageCount: result.pageCount,
           filesCount: new Set(included.map((l) => l.fileId)).size,
           labelsIncluded: result.labelCount,
@@ -173,5 +189,7 @@ export async function processGenerate(jobId: string, isFinalAttempt: boolean) {
       db.batch.update({ where: { id: job.batchId }, data: { status: "READY" } }),
     ]);
     await audit(job.orgId, job.createdById, "job.failed", job.id, { error: message.slice(0, 300) });
+  } finally {
+    for (const d of [tempDir, sourceDir]) if (d) await rm(d, { recursive: true, force: true }).catch(() => undefined);
   }
 }

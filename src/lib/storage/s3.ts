@@ -8,6 +8,8 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import type { Env } from "../env";
 import type { ObjectStorage, SignedUrlOptions } from "./index";
 import { contentDisposition } from "./signing";
@@ -35,6 +37,20 @@ export class S3Storage implements ObjectStorage {
         Bucket: this.bucket,
         Key: key,
         Body: body,
+        ContentType: contentType,
+        ServerSideEncryption: this.config.S3_ENDPOINT ? undefined : "AES256",
+      }),
+    );
+  }
+
+  async putFile(key: string, filePath: string, contentType: string) {
+    const { size } = await stat(filePath);
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: createReadStream(filePath),
+        ContentLength: size,
         ContentType: contentType,
         ServerSideEncryption: this.config.S3_ENDPOINT ? undefined : "AES256",
       }),

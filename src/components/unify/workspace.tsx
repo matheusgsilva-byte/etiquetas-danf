@@ -8,7 +8,7 @@ import { DUPLICATE_LABELS, type DuplicateType } from "@/lib/duplicates";
 import { formatNumber, plural } from "@/lib/format";
 import { groupByMarketplace, sortLabels } from "@/lib/labels";
 import { normalizeSettings, SORT_MODES, type OutputSettings, type SortMode } from "@/lib/output-settings";
-import type { PlanLimits } from "@/lib/plans";
+import { LIMITS } from "@/lib/plans";
 import { JobSummary } from "../job-result";
 import { Alert, Badge, Button, Card, cx, EmptyState, Modal, Select, Spinner, useToast } from "../ui";
 import { Dropzone } from "./dropzone";
@@ -18,6 +18,8 @@ import { SettingsPanel } from "./settings-panel";
 import type { BatchDetail, LabelDto, UploadItem } from "./types";
 
 const UPLOAD_CONCURRENCY = 3;
+/** Etiquetas exibidas por vez na grade (lotes podem ter milhares). */
+const PAGE_SIZE = 240;
 type Filter = "ALL" | "DUPLICATES" | "EXCLUDED";
 
 function estimatePages(labels: LabelDto[], s: OutputSettings) {
@@ -45,11 +47,9 @@ function Step({ n, title, done, active }: { n: number; title: string; done: bool
 
 export function Workspace({
   initialBatchId,
-  limits,
   emptyExtra,
 }: {
   initialBatchId: string | null;
-  limits: PlanLimits;
   emptyExtra?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -60,6 +60,7 @@ export function Workspace({
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [busyFiles, setBusyFiles] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [shown, setShown] = useState(PAGE_SIZE);
   const [settings, setSettings] = useState<OutputSettings | null>(null);
   const [generating, setGenerating] = useState(false);
   const [confirmDup, setConfirmDup] = useState<string | null>(null);
@@ -67,6 +68,10 @@ export function Workspace({
   const [editingName, setEditingName] = useState(false);
 
   const mutating = useRef(0);
+  const dataRef = useRef<BatchDetail | null>(null);
+  const uploadsRef = useRef<UploadItem[]>([]);
+  dataRef.current = data;
+  uploadsRef.current = uploads;
   const batchIdRef = useRef<string | null>(initialBatchId);
   const creating = useRef<Promise<string> | null>(null);
   const queue = useRef<UploadItem[]>([]);
@@ -102,9 +107,10 @@ export function Workspace({
   // Atualização automática enquanto há análise ou geração em andamento.
   useEffect(() => {
     if (!batchId || !(analyzing || jobRunning || uploading || data?.batch.status === "GENERATING")) return;
-    const t = setInterval(() => load(batchId), 1500);
+    // Lotes grandes trazem milhares de etiquetas por consulta: atualiza com menos frequência.
+    const t = setInterval(() => load(batchId), (data?.labels.length ?? 0) > 1500 ? 5000 : 1500);
     return () => clearInterval(t);
-  }, [batchId, analyzing, jobRunning, uploading, data?.batch.status, load]);
+  }, [batchId, analyzing, jobRunning, uploading, data?.batch.status, data?.labels.length, load]);
 
   // Aviso quando a geração termina.
   const lastJobStatus = useRef<string | null>(null);
@@ -158,20 +164,27 @@ export function Workspace({
 
   const addFiles = useCallback(
     (list: File[]) => {
+      // Vagas restantes no lote (o servidor também confere).
+      const used = (dataRef.current?.files.length ?? 0) + uploadsRef.current.filter((u) => u.status !== "error").length;
+      let free = Math.max(0, LIMITS.maxFilesPerBatch - used);
       const items: UploadItem[] = list.map((file) => {
         const key = `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`;
         const isPdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
         if (!isPdf) return { key, file, progress: 0, status: "error", error: "Não é um arquivo PDF." };
-        if (file.size > limits.maxFileSizeMb * 1024 * 1024) {
-          return { key, file, progress: 0, status: "error", error: `Maior que ${limits.maxFileSizeMb} MB (limite do plano).` };
+        if (file.size > LIMITS.maxFileSizeMb * 1024 * 1024) {
+          return { key, file, progress: 0, status: "error", error: `Maior que ${LIMITS.maxFileSizeMb} MB. Divida o PDF em partes menores.` };
         }
+        if (free <= 0) {
+          return { key, file, progress: 0, status: "error", error: `Limite de ${LIMITS.maxFilesPerBatch} arquivos por unificação atingido.` };
+        }
+        free--;
         return { key, file, progress: 0, status: "queued" };
       });
       setUploads((us) => [...us, ...items]);
       queue.current.push(...items.filter((i) => i.status === "queued"));
       pump();
     },
-    [limits.maxFileSizeMb, pump],
+    [pump],
   );
 
   // ------------------------------------------------------------------ mutações
@@ -367,7 +380,7 @@ export function Workspace({
         )}
       </div>
 
-      <Dropzone onFiles={addFiles} compact={hasFiles} disabled={locked} maxFileSizeMb={limits.maxFileSizeMb} />
+      <Dropzone onFiles={addFiles} compact={hasFiles} disabled={locked} maxFileSizeMb={LIMITS.maxFileSizeMb} />
 
       {!hasFiles && emptyExtra}
 
@@ -456,7 +469,10 @@ export function Workspace({
                           type="button"
                           role="tab"
                           aria-selected={filter === f}
-                          onClick={() => setFilter(f)}
+                          onClick={() => {
+                            setFilter(f);
+                            setShown(PAGE_SIZE);
+                          }}
                           className={cx("h-8 rounded px-2.5", filter === f ? "bg-ink text-white" : "text-ink-soft hover:bg-paper")}
                         >
                           {label}
@@ -491,15 +507,28 @@ export function Workspace({
               ) : visible.length === 0 ? (
                 <EmptyState title="Nada neste filtro" action={<Button variant="secondary" size="sm" onClick={() => setFilter("ALL")}>Ver todas</Button>} />
               ) : (
-                <LabelGrid
-                  labels={visible}
-                  allLabels={labels}
-                  sortable={filter === "ALL"}
-                  locked={!!locked}
-                  onReorder={(ids) => reorder(ids)}
-                  onToggle={toggleLabel}
-                  onDecision={decide}
-                />
+                <>
+                  <LabelGrid
+                    labels={visible.slice(0, shown)}
+                    allLabels={labels}
+                    sortable={filter === "ALL"}
+                    locked={!!locked}
+                    onReorder={(ids) => reorder(ids)}
+                    onToggle={toggleLabel}
+                    onDecision={decide}
+                  />
+                  {visible.length > shown && (
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm text-ink-soft">
+                      Mostrando {formatNumber(shown)} de {formatNumber(visible.length)} etiquetas.
+                      <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + PAGE_SIZE)}>
+                        Mostrar mais {formatNumber(Math.min(PAGE_SIZE, visible.length - shown))}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShown(visible.length)}>
+                        Mostrar todas
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </Card>
           </div>

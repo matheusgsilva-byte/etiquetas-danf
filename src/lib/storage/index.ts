@@ -19,6 +19,8 @@ export interface SignedUrlOptions {
 
 export interface ObjectStorage {
   put(key: string, body: Uint8Array, contentType: string): Promise<void>;
+  /** Envia um arquivo do disco sem carregá-lo inteiro na memória. */
+  putFile(key: string, filePath: string, contentType: string): Promise<void>;
   get(key: string): Promise<Buffer>;
   head(key: string): Promise<{ size: number } | null>;
   delete(key: string): Promise<void>;

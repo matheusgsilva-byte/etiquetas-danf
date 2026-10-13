@@ -17,11 +17,11 @@ Verificação de saúde: `GET /api/health` (200 quando banco e Redis respondem).
 
 - [ ] `APP_URL` com `https://` e `APP_SECRET` longo e aleatório (`openssl rand -base64 48`)
 - [ ] `STORAGE_DRIVER=s3` e bucket **privado** (sem acesso público)
-- [ ] `ALLOW_PLAN_SELF_SERVICE=false`
+- [ ] Depois de criar a conta da empresa, `ALLOW_REGISTRATION=false` (bloqueia cadastros de fora)
 - [ ] `SMTP_URL` configurado (recuperação de senha e convites)
 - [ ] Backups automáticos do PostgreSQL
 - [ ] Redis com persistência (AOF) ou gerenciado
-- [ ] Worker com memória suficiente: ~1 GB por geração simultânea de lotes grandes
+- [ ] Worker com pelo menos 1,5 GB de memória (lotes de 20 PDFs × 300 páginas usam ~0,8 GB) e uns 2 GB de disco temporário
 - [ ] HTTPS no balanceador (os cookies de sessão são `Secure` em produção)
 
 ## Opção 1 — AWS (São Paulo, `sa-east-1`)

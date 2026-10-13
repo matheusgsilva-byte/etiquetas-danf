@@ -62,9 +62,11 @@ A primeira ocorrência (ordem de upload) é a original. Nada é removido automat
 
 Páginas em branco são sinalizadas mas não entram na comparação visual.
 
-## Planos e limites
+## Sem planos nem cotas
 
-Definidos em `src/lib/plans.ts` (Gratuito, Profissional, Empresarial): arquivos e páginas por lote, tamanho por arquivo, etiquetas por mês, armazenamento, retenção máxima e usuários. Os limites são verificados no servidor (upload, análise, geração, convites, retenção). Não há cobrança: com `ALLOW_PLAN_SELF_SERVICE=true` o proprietário troca de plano na tela Conta; em produção deixe `false` e altere o plano no banco até integrar um gateway (o ponto de integração é `src/app/api/org/plan/route.ts`).
+Todas as contas têm acesso a tudo, sem limite de etiquetas, páginas, armazenamento ou usuários. Ficam apenas limites técnicos, que protegem o servidor (`src/lib/plans.ts`): até **20 PDFs por unificação** e **100 MB por arquivo**.
+
+Lotes grandes (ex.: 20 arquivos × 300 páginas = 6.000 etiquetas) são montados em blocos de 240 etiquetas. Cada bloco é validado e gravado em disco, e no fim os blocos são juntados com o qpdf. A memória fica abaixo de 1 GB e o tempo fica entre 20 s e 1,5 min, conforme a ordem das etiquetas. O PDF final é enviado ao armazenamento por streaming.
 
 ## Equipe
 

@@ -8,7 +8,8 @@ Sistema web (SaaS) para reunir etiquetas de envio em PDF de vários marketplaces
 - Ordenação por marketplace, arquivo, pedido, data, upload ou arrastando; separação por marketplace.
 - Saída 10 × 15, 10 × 10, A4 (1, 2 ou 4 por folha) ou tamanho original, preservando conteúdo vetorial e códigos de barras.
 - Processamento assíncrono em fila, PDF validado antes de ser liberado, links de download temporários.
-- Dashboard, histórico com filtros, retenção configurável (LGPD), equipe com convites, planos com limites.
+- Dashboard, histórico com filtros, retenção configurável (LGPD), equipe com convites.
+- Sem planos nem cotas: até 20 PDFs por unificação (100 MB cada), sem limite de páginas, etiquetas, armazenamento ou usuários.
 
 Documentação detalhada:
 
@@ -78,7 +79,6 @@ Todas estão descritas em [.env.example](.env.example). As essenciais:
 | `STORAGE_DRIVER` | `s3` em produção, `local` em desenvolvimento |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`… | Armazenamento de objetos |
 | `SMTP_URL`, `MAIL_FROM` | E-mails de recuperação de senha e convites |
-| `ALLOW_PLAN_SELF_SERVICE` | Permite trocar de plano sem pagamento (desligue em produção) |
 
 ## Scripts
 

@@ -31,7 +31,7 @@ export default function RegisterPage() {
   return (
     <>
       <h1 className="text-2xl font-semibold">Criar conta</h1>
-      <p className="mt-1 text-ink-soft">Comece no plano gratuito. Sem cartão de crédito.</p>
+      <p className="mt-1 text-ink-soft">Crie sua conta para unificar etiquetas. Todos os recursos liberados, sem limites de uso.</p>
       <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
         {error && <Alert tone="danger">{error}</Alert>}
         <Field label="Seu nome" htmlFor="name">

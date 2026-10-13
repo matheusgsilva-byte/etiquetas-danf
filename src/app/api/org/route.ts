@@ -4,12 +4,12 @@ import { audit } from "@/lib/audit";
 import { destroySession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { outputSettingsSchema, normalizeSettings } from "@/lib/output-settings";
-import { planLimits } from "@/lib/plans";
+import { LIMITS } from "@/lib/plans";
 import { keys, storage } from "@/lib/storage";
 
 const schema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
-  retentionDays: z.number().int().min(1).max(365).optional(),
+  retentionDays: z.number().int().min(1).max(3650).optional(),
   deleteSourcesAfterGeneration: z.boolean().optional(),
   defaultSettings: outputSettingsSchema.partial().optional(),
 });
@@ -18,9 +18,8 @@ export const PATCH = route(async (req) => {
   const s = await requireSession();
   requireRole(s, ["OWNER", "ADMIN"]);
   const body = await parseBody(req, schema);
-  const limits = planLimits(s.org.plan);
-  if (body.retentionDays && body.retentionDays > limits.maxRetentionDays) {
-    throw new ApiError(400, `O plano ${limits.name} permite reter arquivos por até ${limits.maxRetentionDays} dias.`);
+  if (body.retentionDays && body.retentionDays > LIMITS.maxRetentionDays) {
+    throw new ApiError(400, `O prazo máximo de retenção é ${LIMITS.maxRetentionDays} dias.`);
   }
   await db.organization.update({
     where: { id: s.org.id },

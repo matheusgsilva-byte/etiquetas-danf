@@ -5,7 +5,6 @@ import { randomToken, sha256 } from "@/lib/auth/crypto";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendMail } from "@/lib/mail";
-import { planLimits } from "@/lib/plans";
 
 export const GET = route(async () => {
   const s = await requireSession();
@@ -36,20 +35,6 @@ export const POST = route(async (req) => {
   const s = await requireSession();
   requireRole(s, ["OWNER", "ADMIN"]);
   const body = await parseBody(req, inviteSchema);
-  const limits = planLimits(s.org.plan);
-  const [members, pending] = await Promise.all([
-    db.membership.count({ where: { orgId: s.org.id } }),
-    db.invite.count({ where: { orgId: s.org.id, acceptedAt: null, expiresAt: { gt: new Date() } } }),
-  ]);
-  if (members + pending >= limits.maxMembers) {
-    throw new ApiError(
-      403,
-      limits.maxMembers === 1
-        ? `O plano ${limits.name} permite apenas 1 usuário. Mude para Profissional ou Empresarial para convidar sua equipe.`
-        : `O plano ${limits.name} permite até ${limits.maxMembers} usuários (incluindo convites pendentes).`,
-      "PLAN_LIMIT",
-    );
-  }
   const already = await db.membership.findFirst({ where: { orgId: s.org.id, user: { email: body.email } } });
   if (already) throw new ApiError(409, "Esta pessoa já faz parte da equipe.");
 

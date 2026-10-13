@@ -36,8 +36,6 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v !== "0" && v?.toLowerCase() !== "false"),
-    /** Permite trocar de plano sem pagamento (desenvolvimento / testes). */
-    ALLOW_PLAN_SELF_SERVICE: bool,
 
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
     QPDF_PATH: z.string().optional(),

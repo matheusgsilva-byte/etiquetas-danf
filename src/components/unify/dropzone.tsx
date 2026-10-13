@@ -83,7 +83,7 @@ export function Dropzone({
           <p className={cx("text-ink-soft", compact ? "text-sm" : "mt-1.5")}>
             {compact
               ? "Arraste ou clique para escolher."
-              : `Ou clique para escolher. Pode misturar marketplaces e enviar vários arquivos de uma vez — até ${maxFileSizeMb} MB cada.`}
+              : `Ou clique para escolher. Pode misturar marketplaces e enviar até 20 arquivos de uma vez, com até ${maxFileSizeMb} MB cada.`}
           </p>
         </div>
         {!compact && (

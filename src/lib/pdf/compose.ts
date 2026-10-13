@@ -49,6 +49,8 @@ export interface ComposeOptions {
   loadSource: (sourceId: string) => Promise<PDFDocument>;
   onProgress?: (done: number, total: number) => void | Promise<void>;
   title?: string;
+  /** Arquivos de origem já abertos: processados primeiro para evitar recarregar. */
+  preferredSources?: string[];
 }
 
 const SEPARATOR_SIZE = { width: 100 * MM_TO_PT, height: 150 * MM_TO_PT };
@@ -110,59 +112,94 @@ export async function composeDocument(entries: ComposeEntry[], options: ComposeO
   const bold = await out.embedFont(StandardFonts.HelveticaBold);
 
   const geometry = pageGeometry(settings);
-  const warnings: ComposeWarning[] = [];
-  const pageSizes: { width: number; height: number }[] = [];
+  const warnings: { order: number; warning: ComposeWarning }[] = [];
+  const pageSizes: ({ width: number; height: number } | null)[] = [];
   const total = entries.length;
-  let done = 0;
-  let labelCount = 0;
 
-  let currentPage: PDFPage | null = null;
+  // ---------------------------------------------------------------- 1ª etapa
+  // Monta todas as folhas e decide onde cada etiqueta vai, na ordem pedida.
+  // Assim a 2ª etapa pode abrir cada PDF de origem uma única vez, mesmo quando
+  // as etiquetas de vários arquivos aparecem intercaladas.
+  interface Task {
+    order: number;
+    entry: LabelEntry;
+    pageIndex: number; // posição da folha no PDF de saída
+    cell: Box | null; // null = tamanho original (cópia da página)
+  }
+  const tasks: Task[] = [];
+  let currentPage: number | null = null;
   let cellIndex = 0;
 
-  const newSheet = () => {
-    const g = geometry!;
-    currentPage = out.addPage([g.width, g.height]);
-    pageSizes.push({ width: g.width, height: g.height });
-    cellIndex = 0;
-    if (settings.cutLines && g.cells.length > 1) drawCutLines(currentPage, g.cells);
-  };
-
-  for (const entry of entries) {
+  entries.forEach((entry, order) => {
     if (entry.kind === "separator") {
       const size = geometry ? { width: geometry.width, height: geometry.height } : SEPARATOR_SIZE;
-      const page = out.addPage([size.width, size.height]);
+      drawSeparator(out.addPage([size.width, size.height]), font, bold, entry);
       pageSizes.push(size);
-      drawSeparator(page, font, bold, entry);
-      currentPage = null; // próxima etiqueta começa em folha nova
-    } else {
-      const source = await options.loadSource(entry.sourceId);
-      if (entry.pageIndex < 0 || entry.pageIndex >= source.getPageCount()) {
-        throw new Error(`Página ${entry.pageIndex + 1} não encontrada no arquivo de origem (${entry.ref}).`);
-      }
+      currentPage = null; // a próxima etiqueta começa em folha nova
+      return;
+    }
+    if (!geometry) {
+      // Tamanho original: reserva a posição; a página é copiada na 2ª etapa.
+      out.addPage([entry.cropBox.width || 100, entry.cropBox.height || 100]);
+      pageSizes.push(null);
+      tasks.push({ order, entry, pageIndex: out.getPageCount() - 1, cell: null });
+      return;
+    }
+    if (currentPage === null || cellIndex >= geometry.cells.length) {
+      const page = out.addPage([geometry.width, geometry.height]);
+      pageSizes.push({ width: geometry.width, height: geometry.height });
+      if (settings.cutLines && geometry.cells.length > 1) drawCutLines(page, geometry.cells);
+      currentPage = out.getPageCount() - 1;
+      cellIndex = 0;
+    }
+    tasks.push({ order, entry, pageIndex: currentPage, cell: geometry.cells[cellIndex++] });
+  });
 
-      if (!geometry) {
-        // Tamanho original: cópia fiel da página.
-        const [copied] = await out.copyPages(source, [entry.pageIndex]);
-        out.addPage(copied);
-        const { width, height } = copied.getSize();
-        const rot = (((copied.getRotation().angle % 360) + 360) % 360);
-        pageSizes.push(rot === 90 || rot === 270 ? { width: height, height: width } : { width, height });
-      } else {
-        if (!currentPage || cellIndex >= geometry.cells.length) newSheet();
-        const cell = geometry.cells[cellIndex++];
-        const box = effectiveBox(entry.cropBox, entry.contentBox, settings.trimWhitespace);
-        const placement = placeInCell(box, entry.rotation, cell, {
+  // ---------------------------------------------------------------- 2ª etapa
+  // Agrupa por arquivo de origem; os que já estão abertos vêm primeiro.
+  const bySource = new Map<string, Task[]>();
+  for (const t of tasks) {
+    const list = bySource.get(t.entry.sourceId);
+    if (list) list.push(t);
+    else bySource.set(t.entry.sourceId, [t]);
+  }
+  const preferred = (options.preferredSources ?? []).filter((id) => bySource.has(id));
+  const sourceOrder = [...preferred, ...[...bySource.keys()].filter((id) => !preferred.includes(id))];
+
+  let done = entries.length - tasks.length; // separadores já prontos
+  for (const sourceId of sourceOrder) {
+    const list = bySource.get(sourceId)!;
+    const source = await options.loadSource(sourceId);
+    for (const t of list) {
+      if (t.entry.pageIndex < 0 || t.entry.pageIndex >= source.getPageCount()) {
+        throw new Error(`Página ${t.entry.pageIndex + 1} não encontrada no arquivo de origem (${t.entry.ref}).`);
+      }
+    }
+
+    if (!geometry) {
+      const copied = await out.copyPages(source, list.map((t) => t.entry.pageIndex));
+      copied.forEach((page, i) => {
+        const pos = list[i].pageIndex;
+        out.removePage(pos);
+        out.insertPage(pos, page);
+        const { width, height } = page.getSize();
+        const rot = (((page.getRotation().angle % 360) + 360) % 360);
+        pageSizes[pos] = rot === 90 || rot === 270 ? { width: height, height: width } : { width, height };
+      });
+    } else {
+      for (const t of list) {
+        const box = effectiveBox(t.entry.cropBox, t.entry.contentBox, settings.trimWhitespace);
+        const placement = placeInCell(box, t.entry.rotation, t.cell!, {
           scaleMode: settings.scaleMode,
           autoRotate: settings.autoRotate,
         });
-        const srcPage = source.getPage(entry.pageIndex);
-        const embedded = await out.embedPage(srcPage, {
+        const embedded = await out.embedPage(source.getPage(t.entry.pageIndex), {
           left: box.x,
           bottom: box.y,
           right: box.x + box.width,
           top: box.y + box.height,
         });
-        currentPage!.drawPage(embedded, {
+        out.getPage(t.pageIndex).drawPage(embedded, {
           x: placement.x,
           y: placement.y,
           xScale: placement.scale,
@@ -171,20 +208,28 @@ export async function composeDocument(entries: ComposeEntry[], options: ComposeO
         });
         if (placement.scale < MIN_READABLE_SCALE) {
           warnings.push({
-            ref: entry.ref,
-            message: `Etiqueta reduzida para ${Math.round(placement.scale * 100)}% para caber no formato escolhido. Confira a leitura do código de barras ou use outro formato.`,
+            order: t.order,
+            warning: {
+              ref: t.entry.ref,
+              message: `Etiqueta reduzida para ${Math.round(placement.scale * 100)}% para caber no formato escolhido. Confira a leitura do código de barras ou use outro formato.`,
+            },
           });
         }
       }
-      labelCount++;
     }
-    done++;
-    if (options.onProgress && (done % 5 === 0 || done === total)) await options.onProgress(done, total);
+    done += list.length;
+    if (options.onProgress) await options.onProgress(done, total);
   }
 
   if (out.getPageCount() === 0) throw new Error("Nenhuma página foi gerada.");
   const bytes = await out.save({ useObjectStreams: true });
-  return { bytes, pageCount: out.getPageCount(), labelCount, warnings, pageSizes };
+  return {
+    bytes,
+    pageCount: out.getPageCount(),
+    labelCount: tasks.length,
+    warnings: warnings.sort((a, b) => a.order - b.order).map((w) => w.warning),
+    pageSizes: pageSizes.map((p) => p ?? { width: 0, height: 0 }),
+  };
 }
 
 /**

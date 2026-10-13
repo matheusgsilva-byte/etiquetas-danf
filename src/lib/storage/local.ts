@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat, writeFile, rename } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, stat, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Env } from "../env";
@@ -24,6 +24,14 @@ export class LocalStorage implements ObjectStorage {
     // Escrita atômica: nunca expõe um arquivo pela metade.
     const tmp = `${full}.${randomUUID()}.tmp`;
     await writeFile(tmp, body, { mode: 0o600 });
+    await rename(tmp, full);
+  }
+
+  async putFile(key: string, filePath: string) {
+    const full = this.resolve(key);
+    await mkdir(path.dirname(full), { recursive: true });
+    const tmp = `${full}.${randomUUID()}.tmp`;
+    await copyFile(filePath, tmp);
     await rename(tmp, full);
   }
 

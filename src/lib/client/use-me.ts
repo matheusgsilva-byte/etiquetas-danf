@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { OutputSettings } from "../output-settings";
-import type { PlanId, PlanLimits } from "../plans";
+import type { Limits } from "../plans";
 import { api } from "./api";
 
 export interface Me {
@@ -11,15 +11,12 @@ export interface Me {
   org: {
     id: string;
     name: string;
-    plan: PlanId;
     retentionDays: number;
     deleteSourcesAfterGeneration: boolean;
     defaultSettings: OutputSettings;
   };
-  limits: PlanLimits;
-  plans: Record<PlanId, PlanLimits>;
+  limits: Limits;
   usage: { labelsThisMonth: number; storageBytes: number; members: number };
-  planSelfService: boolean;
 }
 
 export function useMe() {

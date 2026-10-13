@@ -5,7 +5,6 @@ import { db } from "../../lib/db";
 import { analyzePdf } from "../../lib/pdf/analyze";
 import { PdfInputError } from "../../lib/pdf/load";
 import { shipmentKey } from "../../lib/marketplaces";
-import { planLimits } from "../../lib/plans";
 import { keys, storage } from "../../lib/storage";
 import { recomputeDuplicates, refreshBatchStatus } from "../../lib/batch-service";
 
@@ -58,21 +57,6 @@ export async function processAnalyze(fileId: string, isFinalAttempt: boolean) {
     return;
   }
 
-  // Limite de páginas por lote do plano.
-  const limits = planLimits(org.plan);
-  const pagesSoFar = await db.sourceFile.aggregate({
-    where: { batchId: batch.id, status: "READY", id: { not: fileId } },
-    _sum: { pageCount: true },
-  });
-  if ((pagesSoFar._sum.pageCount ?? 0) + analysis.pageCount > limits.maxPagesPerBatch) {
-    await fail(
-      fileId,
-      batch.id,
-      `Este arquivo ultrapassa o limite de ${limits.maxPagesPerBatch} páginas por lote do plano ${limits.name}.`,
-    );
-    return;
-  }
-
   // Arquivo reparado/desprotegido pelo qpdf: guarda a versão normalizada para a unificação.
   if (analysis.normalizedBytes) {
     await storage().put(file.storageKey, analysis.normalizedBytes, "application/pdf");
@@ -80,11 +64,15 @@ export async function processAnalyze(fileId: string, isFinalAttempt: boolean) {
 
   // Miniaturas.
   const thumbKeys = new Map<number, string>();
-  for (const page of analysis.pages) {
-    if (!page.thumbnail) continue;
-    const key = keys.thumbnail(org.id, batch.id, file.id, page.index);
-    await storage().put(key, page.thumbnail, "image/jpeg");
-    thumbKeys.set(page.index, key);
+  const withThumb = analysis.pages.filter((p) => p.thumbnail);
+  for (let i = 0; i < withThumb.length; i += 8) {
+    await Promise.all(
+      withThumb.slice(i, i + 8).map(async (page) => {
+        const key = keys.thumbnail(org.id, batch.id, file.id, page.index);
+        await storage().put(key, page.thumbnail!, "image/jpeg");
+        thumbKeys.set(page.index, key);
+      }),
+    );
   }
 
   await db.$transaction([
