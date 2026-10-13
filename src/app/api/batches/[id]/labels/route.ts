@@ -83,7 +83,8 @@ export const PATCH = route(async (req, { params }: IdParams) => {
         data: { settings: normalizeSettings({ ...normalizeSettings(batch.settings), sort: body.sort }) },
       });
     }
-  });
+    // Lotes grandes (até 20 arquivos × centenas de páginas) passam dos 5 s padrão do Prisma.
+  }, { timeout: 60_000, maxWait: 15_000 });
 
   if (body.bulk) await audit(s.org.id, s.user.id, `duplicates.${body.bulk.toLowerCase()}`, id);
   return json({ ok: true });
