@@ -24,7 +24,7 @@ O servidor web nunca processa PDFs pesados: ele grava o arquivo e coloca um job 
 2. **Validação no upload** — extensão/tipo, assinatura `%PDF-`, tamanho e quantidade de arquivos do plano, espaço de armazenamento.
 3. **Análise (worker)** — para cada página: tamanho exibido, rotação, texto, marketplace, nº do pedido, rastreio, área com conteúdo, impressão digital visual e miniatura. PDFs protegidos só com senha de proprietário ou danificados são normalizados pelo `qpdf`; arquivos corrompidos ou que não são PDF recebem mensagem de erro clara e não entram no lote.
 4. **Revisão** — tabela de arquivos (nome, origem, tamanho, páginas, status, remover, reprocessar) e grade de etiquetas com miniatura, marketplace, pedido, tamanho e duplicidades.
-5. **Organização** — ordenar por marketplace, nome do arquivo, data de importação, nº do pedido, ordem de upload ou arrastar e soltar (mouse, toque ou teclado). A ordem é gravada no servidor.
+5. **Organização** — ordenar por marketplace, nome do arquivo, data de importação, nº do pedido, **SKU**, ordem de upload ou arrastar e soltar (mouse, toque ou teclado). A ordem é gravada no servidor.
 6. **Impressão** — formato, etiquetas por folha (A4), tamanho real ou ajuste ao espaço, margem, giro automático, recorte de margens brancas, linhas de corte, separação por marketplace e páginas separadoras. O painel mostra quantas etiquetas e páginas o PDF terá.
 7. **Gerar PDF unificado** — se houver duplicidades sem decisão, a geração pede confirmação. O worker monta o PDF, **reabre e valida** (nº e tamanho das páginas), grava, confere o tamanho gravado e só então libera o download.
 8. **Resultado** — resumo (etiquetas, páginas, arquivos, descartadas, tempo, tamanho, por marketplace, avisos de redução), visualizar e baixar por link temporário.
@@ -48,6 +48,12 @@ Validação feita no desenvolvimento: as saídas nos seis formatos foram renderi
 **Adicionar um marketplace:** inclua um item em `MARKETPLACES` com `id`, `name`, `color` e os padrões. Nada mais precisa mudar — filtros, gráficos e badges usam o registro.
 
 Os padrões de pedido foram escritos a partir dos formatos públicos conhecidos de cada plataforma. Vale conferir com etiquetas reais da sua operação e ajustar as expressões se algum campo não for reconhecido (a unificação funciona mesmo sem o nº do pedido).
+
+## SKU
+
+O SKU impresso na etiqueta é lido na análise e aparece no cartão de cada etiqueta. Em tabelas com cabeçalho "SKU" (como a DANFE simplificada), a coluna é lida pela posição do texto e as linhas quebradas são remontadas. Sem tabela, o sistema procura "SKU: …" no texto. Quando há vários itens, os SKUs aparecem separados por " | " e o primeiro é usado na ordenação. A ordenação ignora acentos e espaços, e as etiquetas sem SKU ficam no fim.
+
+Uma ressalva: quando uma palavra ocupa a linha inteira da coluna, não dá para saber se a quebra foi no meio da palavra ou entre palavras. Por isso a exibição pode mostrar, por exemplo, "CALCINHASORTIDA" em vez de "CALCINHA SORTIDA". A ordenação não é afetada.
 
 ## Duplicidades
 

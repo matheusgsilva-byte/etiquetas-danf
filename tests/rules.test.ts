@@ -10,6 +10,7 @@ import { detectMarketplace, extractIdentifiers, shipmentKey } from "../src/lib/m
 import { normalizeSettings, MM_TO_PT } from "../src/lib/output-settings";
 import { effectiveBox, pageGeometry, placeInCell } from "../src/lib/pdf/layout";
 import { decodeDownloadToken, encodeDownloadToken } from "../src/lib/storage/signing";
+import { extractSku, skuSortKey } from "../src/lib/pdf/sku";
 
 describe("duplicidades", () => {
   const files = [
@@ -144,5 +145,48 @@ describe("links assinados", () => {
     assert.equal(decodeDownloadToken(t.replace(/^./, "A"), secret), null);
     const expired = encodeDownloadToken({ key: "k", exp: Math.floor(Date.now() / 1000) - 1 }, secret);
     assert.equal(decodeDownloadToken(expired, secret), null);
+  });
+});
+
+describe("SKU", () => {
+  const it2 = (str: string, x: number, y: number, width: number) => ({ str, x, y, width });
+  const header = [it2("SKU", 8, 266, 21), it2("Descrição", 58, 266, 44), it2("Variação", 212, 266, 39), it2("QTD", 262, 266, 21)];
+  it("remonta o SKU quebrado na coluna da DANFE", () => {
+    const items = [
+      ...header,
+      it2("S-KIT 1", 8, 245, 29), it2("SUTIÃ", 8, 233, 25), it2("AMAMENT", 8, 221, 42.5), it2("AÇÃO", 8, 209, 24),
+      it2("BOJO", 8, 197, 23), it2("REMOVÍVE", 8, 185, 44.8), it2("L COR", 8, 173, 26), it2("ÚNICA-1-", 8, 161, 37),
+      it2("GG-MAX", 8, 149, 34), it2("Sutiã Amamentação Bojo Removível", 58, 245, 138), it2("1", 270, 245, 5),
+      it2("Total", 8, 130, 22), it2("1", 270, 131, 5),
+    ];
+    assert.equal(extractSku(items, ""), "S-KIT 1 SUTIÃ AMAMENTAÇÃO BOJO REMOVÍVEL COR ÚNICA-1-GG-MAX");
+  });
+  it("quebra entre palavras quando a linha tem espaço", () => {
+    const items = [...header, it2("BOJO COR", 8, 245, 44), it2("ÚNICA-1-G-", 8, 233, 46), it2("MAX", 8, 221, 18), it2("1", 270, 245, 5), it2("Total", 8, 200, 22)];
+    assert.equal(extractSku(items, ""), "BOJO COR ÚNICA-1-G-MAX");
+  });
+  it("vários itens e SKU grudado na descrição", () => {
+    const items = [
+      ...header,
+      it2("kit1sutiãinfantil 1 Sutiã Top Infantil", 8, 245, 140), it2("1", 270, 245, 5),
+      it2("kit3sunga", 8, 220, 40), it2("infantil", 8, 208, 30), it2("2", 270, 220, 5),
+      it2("Total", 8, 190, 22),
+    ];
+    assert.equal(extractSku(items, ""), "kit1sutiãinfantil | kit3sungainfantil");
+  });
+  it("SKU em texto corrido e chave de ordenação", () => {
+    assert.equal(extractSku([], "Pedido 123 SKU: ABC-55 Qtd 1"), "ABC-55");
+    assert.equal(skuSortKey("S-KIT 1 Sutiã | outro"), "S-KIT1SUTIA");
+    assert.equal(skuSortKey(null), null);
+  });
+  it("ordena por SKU com os sem SKU no fim", () => {
+    const base = { position: 0, marketplace: "outros", fileName: "a.pdf", pageIndex: 0, orderId: null, importedAt: "2026-10-12" };
+    const L = [
+      { ...base, id: "1", uploadIndex: 1, skuKey: "S-KIT3" },
+      { ...base, id: "2", uploadIndex: 2, skuKey: null },
+      { ...base, id: "3", uploadIndex: 3, skuKey: "KIT6MEIA" },
+      { ...base, id: "4", uploadIndex: 4, skuKey: "S-KIT1" },
+    ];
+    assert.equal(sortLabels(L, "SKU").map((l) => l.id).join(""), "3412");
   });
 });

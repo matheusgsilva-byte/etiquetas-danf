@@ -21,6 +21,7 @@ export const SORT_MODES = {
   MARKETPLACE: "Marketplace",
   FILENAME: "Nome do arquivo",
   ORDER_ID: "Número do pedido",
+  SKU: "SKU",
   IMPORTED_AT: "Data de importação",
 } as const;
 
@@ -39,7 +40,7 @@ export const outputSettingsSchema = z.object({
   cutLines: z.boolean().default(true),
   groupByMarketplace: z.boolean().default(false),
   separatorPages: z.boolean().default(false),
-  sort: z.enum(["CUSTOM", "UPLOAD", "MARKETPLACE", "FILENAME", "ORDER_ID", "IMPORTED_AT"]).default("UPLOAD"),
+  sort: z.enum(["CUSTOM", "UPLOAD", "MARKETPLACE", "FILENAME", "ORDER_ID", "SKU", "IMPORTED_AT"]).default("UPLOAD"),
 });
 
 export type OutputSettings = z.infer<typeof outputSettingsSchema>;

@@ -19,7 +19,7 @@ import type { BatchDetail, LabelDto, UploadItem } from "./types";
 
 const UPLOAD_CONCURRENCY = 3;
 /** Etiquetas exibidas por vez na grade (lotes podem ter milhares). */
-const PAGE_SIZE = 240;
+const PAGE_SIZE = 100;
 type Filter = "ALL" | "DUPLICATES" | "EXCLUDED";
 
 function estimatePages(labels: LabelDto[], s: OutputSettings) {

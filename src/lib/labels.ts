@@ -12,6 +12,8 @@ export interface SortableLabel {
   uploadIndex: number;
   pageIndex: number;
   orderId: string | null;
+  /** Chave de ordenação do SKU (ver skuSortKey). */
+  skuKey?: string | null;
   importedAt: string | Date;
 }
 
@@ -39,6 +41,14 @@ export function sortLabels<T extends SortableLabel>(labels: T[], mode: SortMode)
         if (a.orderId && b.orderId) return collator.compare(a.orderId, b.orderId) || byUpload(a, b);
         if (a.orderId) return -1;
         if (b.orderId) return 1;
+        return byUpload(a, b);
+      });
+    case "SKU":
+      // Etiquetas sem SKU vão para o fim; mesmo SKU mantém a ordem de upload.
+      return list.sort((a, b) => {
+        if (a.skuKey && b.skuKey) return collator.compare(a.skuKey, b.skuKey) || byUpload(a, b);
+        if (a.skuKey) return -1;
+        if (b.skuKey) return 1;
         return byUpload(a, b);
       });
     case "IMPORTED_AT":

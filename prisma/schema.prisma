@@ -205,6 +205,10 @@ model Label {
   confidence        String
   orderId           String?
   trackingCode      String?
+  /// SKU(s) impresso(s) na etiqueta ("A | B" quando há vários itens).
+  sku               String?
+  /// Chave de ordenação do SKU (sem acentos e sem espaços).
+  skuKey            String?
   shipmentKey       String?
   fingerprint       String?
   thumbnailKey      String?

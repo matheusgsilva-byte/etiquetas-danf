@@ -15,6 +15,7 @@ import {
 import { loadPdfForProcessing } from "./load";
 import { openWithPdfJs } from "./pdfjs";
 import type { Box } from "./layout";
+import { extractSku, type TextItem } from "./sku";
 
 export interface PageAnalysis {
   index: number;
@@ -30,6 +31,8 @@ export interface PageAnalysis {
   confidence: "alta" | "media" | "baixa";
   orderId: string | null;
   trackingCode: string | null;
+  /** SKU(s) impresso(s) na etiqueta, quando houver (vários separados por " | "). */
+  sku: string | null;
   fingerprint: string | null;
   thumbnail: Buffer | null;
   blank: boolean;
@@ -195,6 +198,7 @@ async function analyzeLoaded(
       const swap = rotation === 90 || rotation === 270;
 
       let text = "";
+      let positioned: TextItem[] = [];
       let rendered: RenderResult | null = null;
       if (pdf) {
         try {
@@ -206,6 +210,11 @@ async function analyzeLoaded(
             .replace(/\s+/g, " ")
             .trim()
             .slice(0, 20_000);
+          positioned = content.items.flatMap((item) =>
+            "str" in item && item.str.trim()
+              ? [{ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width }]
+              : [],
+          );
           p.cleanup();
         } catch {
           text = "";
@@ -237,6 +246,7 @@ async function analyzeLoaded(
         confidence: detection.confidence,
         orderId: ids.orderId,
         trackingCode: ids.trackingCode,
+        sku: extractSku(positioned, text),
         fingerprint,
         thumbnail: rendered?.thumbnail ?? null,
         blank: rendered?.blank ?? false,

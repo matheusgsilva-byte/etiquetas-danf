@@ -87,6 +87,12 @@ function LabelCard({ label, sequence, sortable, locked, originalName, onToggle, 
         <p className="truncate font-mono text-xs text-ink" title={label.orderId ?? label.trackingCode ?? undefined}>
           {label.orderId ?? label.trackingCode ?? <span className="font-sans text-ink-faint">Sem nº de pedido</span>}
         </p>
+        {label.sku && (
+          <p className="line-clamp-2 text-xs text-ink-soft" title={label.sku}>
+            <span className="text-ink-faint">SKU </span>
+            {label.sku}
+          </p>
+        )}
         <p className="truncate text-xs text-ink-faint" title={label.fileName}>
           {label.fileName} · pág. {label.pageIndex + 1}
         </p>
