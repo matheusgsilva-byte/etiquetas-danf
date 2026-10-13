@@ -209,6 +209,10 @@ model Label {
   sku               String?
   /// Chave de ordenação do SKU (sem acentos e sem espaços).
   skuKey            String?
+  /// Descrição do produto impressa na etiqueta ("A | B" quando há vários itens).
+  description       String?
+  /// Chave de ordenação da descrição (sem acentos, minúsculas).
+  descriptionKey    String?
   shipmentKey       String?
   fingerprint       String?
   thumbnailKey      String?

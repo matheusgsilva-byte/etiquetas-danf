@@ -5,7 +5,7 @@ import { db } from "../../lib/db";
 import { analyzePdf } from "../../lib/pdf/analyze";
 import { PdfInputError } from "../../lib/pdf/load";
 import { shipmentKey } from "../../lib/marketplaces";
-import { skuSortKey } from "../../lib/pdf/sku";
+import { descriptionSortKey, skuSortKey } from "../../lib/pdf/sku";
 import { keys, storage } from "../../lib/storage";
 import { recomputeDuplicates, refreshBatchStatus } from "../../lib/batch-service";
 
@@ -94,6 +94,8 @@ export async function processAnalyze(fileId: string, isFinalAttempt: boolean) {
         trackingCode: p.trackingCode,
         sku: p.sku,
         skuKey: skuSortKey(p.sku),
+        description: p.description,
+        descriptionKey: descriptionSortKey(p.description),
         shipmentKey: shipmentKey(p.marketplace, p),
         fingerprint: p.fingerprint,
         thumbnailKey: thumbKeys.get(p.index) ?? null,

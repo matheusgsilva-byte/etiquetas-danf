@@ -53,11 +53,12 @@ function clipToColumn(item: TextItem, columnEnd: number): TextItem {
   return { ...item, str: clipped, width: clipped.length * charW };
 }
 
-function fromTable(items: TextItem[]): string[] | null {
-  const header = items.find((i) => norm(i.str) === "sku");
+/** Lê uma coluna de tabela pelo cabeçalho; retorna um texto por item (linha da tabela). */
+export function readColumn(items: TextItem[], isHeader: (normalized: string) => boolean): string[] | null {
+  const header = items.find((i) => isHeader(norm(i.str)));
   if (!header) return null;
   const sameRow = (i: TextItem) => Math.abs(i.y - header.y) < 3 && i !== header;
-  // Próxima coluna à direita do SKU (normalmente "Descrição").
+  // Próxima coluna à direita (ex.: SKU → Descrição → Variação).
   const right = items.filter((i) => sameRow(i) && i.x > header.x).sort((a, b) => a.x - b.x);
   const nextX = right[0]?.x ?? header.x + 120;
   const qtyHeader = right.find((i) => /^(qtd|qtde|quant|quantidade)/.test(norm(i.str)));
@@ -65,7 +66,7 @@ function fromTable(items: TextItem[]): string[] | null {
 
   // Fim da tabela: "Total" abaixo do cabeçalho, ou o fim da página.
   const total = items
-    .filter((i) => i.y < header.y - 2 && /^total/.test(norm(i.str)) && Math.abs(i.x - header.x) < 10)
+    .filter((i) => i.y < header.y - 2 && /^total/.test(norm(i.str)))
     .sort((a, b) => b.y - a.y)[0];
   const bottom = total ? total.y + 2 : -Infinity;
 
@@ -92,8 +93,8 @@ function fromTable(items: TextItem[]): string[] | null {
     for (let r = 0; r < rowStarts.length; r++) if (rowStarts[r] >= it.y - 1.5) idx = r;
     rows[idx].push(it);
   }
-  const skus = rows.map((r) => joinWrapped(r, columnWidth)).filter(Boolean);
-  return skus.length ? skus : null;
+  const values = rows.map((r) => joinWrapped(r, columnWidth)).filter(Boolean);
+  return values.length ? values : null;
 }
 
 function fromInline(text: string): string[] | null {
@@ -108,7 +109,7 @@ function fromInline(text: string): string[] | null {
 }
 
 export function extractSku(items: TextItem[], fullText: string): string | null {
-  const skus = fromTable(items) ?? fromInline(fullText);
+  const skus = readColumn(items, (h) => h === "sku") ?? fromInline(fullText);
   if (!skus) return null;
   return skus.join(" | ").slice(0, 300);
 }
@@ -117,4 +118,25 @@ export function extractSku(items: TextItem[], fullText: string): string | null {
 export function skuSortKey(sku: string | null | undefined): string | null {
   if (!sku) return null;
   return sku.split(" | ")[0].normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "").toUpperCase();
+}
+
+/**
+ * Descrição do produto: coluna "Descrição"/"Produto" da tabela (ex.: DANFE
+ * simplificada), ou "Produto: ..." / "Descrição: ..." no texto corrido.
+ */
+export function extractDescription(items: TextItem[], fullText: string): string | null {
+  const values =
+    readColumn(items, (h) => h === "descricao" || h === "descricao do produto" || h === "produto" || h === "produtos") ??
+    (() => {
+      const m = fullText.match(/\b(?:Produto|Descri[çc][ãa]o)\s*:\s*(.{3,120}?)(?=\s+(?:SKU|Qtd|Quantidade|Varia[çc][ãa]o|Total|Pedido)\b|$)/i);
+      return m ? [m[1].trim()] : null;
+    })();
+  if (!values) return null;
+  return values.join(" | ").slice(0, 500);
+}
+
+/** Chave de ordenação da descrição: sem acentos, minúsculas, espaços simples. */
+export function descriptionSortKey(description: string | null | undefined): string | null {
+  if (!description) return null;
+  return description.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }

@@ -14,6 +14,8 @@ export interface SortableLabel {
   orderId: string | null;
   /** Chave de ordenação do SKU (ver skuSortKey). */
   skuKey?: string | null;
+  /** Chave de ordenação da descrição (ver descriptionSortKey). */
+  descriptionKey?: string | null;
   importedAt: string | Date;
 }
 
@@ -49,6 +51,21 @@ export function sortLabels<T extends SortableLabel>(labels: T[], mode: SortMode)
         if (a.skuKey && b.skuKey) return collator.compare(a.skuKey, b.skuKey) || byUpload(a, b);
         if (a.skuKey) return -1;
         if (b.skuKey) return 1;
+        return byUpload(a, b);
+      });
+    case "DESCRIPTION":
+      // Descrições iguais ficam em sequência (desempate por SKU e ordem de upload);
+      // etiquetas sem descrição vão para o fim.
+      return list.sort((a, b) => {
+        if (a.descriptionKey && b.descriptionKey) {
+          return (
+            collator.compare(a.descriptionKey, b.descriptionKey) ||
+            collator.compare(a.skuKey ?? "", b.skuKey ?? "") ||
+            byUpload(a, b)
+          );
+        }
+        if (a.descriptionKey) return -1;
+        if (b.descriptionKey) return 1;
         return byUpload(a, b);
       });
     case "IMPORTED_AT":

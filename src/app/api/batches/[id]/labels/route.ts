@@ -7,7 +7,7 @@ import { normalizeSettings } from "@/lib/output-settings";
 const schema = z.object({
   /** Nova ordem completa (ids das etiquetas). */
   order: z.array(z.string()).max(20_000).optional(),
-  sort: z.enum(["CUSTOM", "UPLOAD", "MARKETPLACE", "FILENAME", "ORDER_ID", "SKU", "IMPORTED_AT"]).optional(),
+  sort: z.enum(["CUSTOM", "UPLOAD", "MARKETPLACE", "FILENAME", "ORDER_ID", "SKU", "DESCRIPTION", "IMPORTED_AT"]).optional(),
   changes: z
     .array(
       z.object({

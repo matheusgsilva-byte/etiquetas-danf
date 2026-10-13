@@ -15,7 +15,7 @@ import {
 import { loadPdfForProcessing } from "./load";
 import { openWithPdfJs } from "./pdfjs";
 import type { Box } from "./layout";
-import { extractSku, type TextItem } from "./sku";
+import { extractDescription, extractSku, type TextItem } from "./sku";
 
 export interface PageAnalysis {
   index: number;
@@ -33,6 +33,8 @@ export interface PageAnalysis {
   trackingCode: string | null;
   /** SKU(s) impresso(s) na etiqueta, quando houver (vários separados por " | "). */
   sku: string | null;
+  /** Descrição do produto impressa na etiqueta, quando houver. */
+  description: string | null;
   fingerprint: string | null;
   thumbnail: Buffer | null;
   blank: boolean;
@@ -247,6 +249,7 @@ async function analyzeLoaded(
         orderId: ids.orderId,
         trackingCode: ids.trackingCode,
         sku: extractSku(positioned, text),
+        description: extractDescription(positioned, text),
         fingerprint,
         thumbnail: rendered?.thumbnail ?? null,
         blank: rendered?.blank ?? false,

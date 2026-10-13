@@ -10,7 +10,7 @@ import { detectMarketplace, extractIdentifiers, shipmentKey } from "../src/lib/m
 import { normalizeSettings, MM_TO_PT } from "../src/lib/output-settings";
 import { effectiveBox, pageGeometry, placeInCell } from "../src/lib/pdf/layout";
 import { decodeDownloadToken, encodeDownloadToken } from "../src/lib/storage/signing";
-import { extractSku, skuSortKey } from "../src/lib/pdf/sku";
+import { descriptionSortKey, extractDescription, extractSku, skuSortKey } from "../src/lib/pdf/sku";
 
 describe("duplicidades", () => {
   const files = [
@@ -188,5 +188,29 @@ describe("SKU", () => {
       { ...base, id: "4", uploadIndex: 4, skuKey: "S-KIT1" },
     ];
     assert.equal(sortLabels(L, "SKU").map((l) => l.id).join(""), "3412");
+  });
+});
+
+describe("Descrição", () => {
+  const it2 = (str: string, x: number, y: number, width: number) => ({ str, x, y, width });
+  it("lê a coluna Descrição com várias linhas", () => {
+    const items = [
+      it2("SKU", 8, 266, 21), it2("Descrição", 58, 266, 44), it2("Variação", 212, 266, 39), it2("QTD", 262, 266, 21),
+      it2("S-KIT 1", 8, 245, 29), it2("Cinta Modeladora Abdominal De Alta", 58, 245, 140), it2("Compressão Afina Cintura", 58, 233, 100),
+      it2("M", 212, 245, 6), it2("1", 270, 245, 5), it2("Total", 8, 200, 22),
+    ];
+    assert.equal(extractDescription(items, ""), "Cinta Modeladora Abdominal De Alta Compressão Afina Cintura");
+    assert.equal(descriptionSortKey("Sutiã  Amamentação"), "sutia amamentacao");
+  });
+  it("agrupa descrições iguais em sequência", () => {
+    const base = { position: 0, marketplace: "outros", fileName: "a.pdf", pageIndex: 0, orderId: null, importedAt: "2026-10-12" };
+    const L = [
+      { ...base, id: "1", uploadIndex: 1, descriptionKey: "sutia top", skuKey: "B" },
+      { ...base, id: "2", uploadIndex: 2, descriptionKey: "calcinha tanga", skuKey: "A" },
+      { ...base, id: "3", uploadIndex: 3, descriptionKey: null },
+      { ...base, id: "4", uploadIndex: 4, descriptionKey: "sutia top", skuKey: "A" },
+      { ...base, id: "5", uploadIndex: 5, descriptionKey: "calcinha tanga", skuKey: "A" },
+    ];
+    assert.equal(sortLabels(L, "DESCRIPTION").map((l) => l.id).join(""), "25413");
   });
 });

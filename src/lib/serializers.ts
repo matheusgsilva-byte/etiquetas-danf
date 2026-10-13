@@ -68,6 +68,8 @@ export function serializeLabel(l: Label, file: SourceFile) {
     trackingCode: l.trackingCode,
     sku: l.sku,
     skuKey: l.skuKey,
+    description: l.description,
+    descriptionKey: l.descriptionKey,
     blank: l.blank,
     position: l.position,
     excluded: l.excluded,

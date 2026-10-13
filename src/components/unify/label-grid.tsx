@@ -87,6 +87,11 @@ function LabelCard({ label, sequence, sortable, locked, originalName, onToggle, 
         <p className="truncate font-mono text-xs text-ink" title={label.orderId ?? label.trackingCode ?? undefined}>
           {label.orderId ?? label.trackingCode ?? <span className="font-sans text-ink-faint">Sem nº de pedido</span>}
         </p>
+        {label.description && (
+          <p className="line-clamp-2 text-xs text-ink" title={label.description}>
+            {label.description}
+          </p>
+        )}
         {label.sku && (
           <p className="line-clamp-2 text-xs text-ink-soft" title={label.sku}>
             <span className="text-ink-faint">SKU </span>
