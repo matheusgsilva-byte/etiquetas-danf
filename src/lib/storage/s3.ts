@@ -92,6 +92,21 @@ export class S3Storage implements ObjectStorage {
     } while (token);
   }
 
+  async stream(key: string) {
+    try {
+      const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (!res.Body) return null;
+      return {
+        body: res.Body.transformToWebStream() as ReadableStream<Uint8Array>,
+        size: Number(res.ContentLength ?? 0),
+      };
+    } catch (err) {
+      const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (e.$metadata?.httpStatusCode === 404 || e.name === "NoSuchKey") return null;
+      throw err;
+    }
+  }
+
   async signedUrl(key: string, options: SignedUrlOptions = {}) {
     const command = new GetObjectCommand({
       Bucket: this.bucket,

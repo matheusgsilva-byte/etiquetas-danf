@@ -4,7 +4,8 @@
  *  - "local": disco do servidor — apenas para desenvolvimento ou servidor único.
  *
  * Chaves seguem o padrão org/<orgId>/... garantindo isolamento por empresa.
- * Downloads sempre usam links temporários assinados.
+ * O PDF final é entregue pelo próprio servidor (rota de download), sem depender
+ * de links pré-assinados do provedor.
  */
 import { env } from "../env";
 import { LocalStorage } from "./local";
@@ -26,6 +27,8 @@ export interface ObjectStorage {
   delete(key: string): Promise<void>;
   deletePrefix(prefix: string): Promise<void>;
   signedUrl(key: string, options?: SignedUrlOptions): Promise<string>;
+  /** Lê o objeto em fluxo (para o servidor entregar o arquivo sem carregá-lo inteiro). */
+  stream(key: string): Promise<{ body: ReadableStream<Uint8Array>; size: number } | null>;
 }
 
 const globalForStorage = globalThis as unknown as { storage?: ObjectStorage };

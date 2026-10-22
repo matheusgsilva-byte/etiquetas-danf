@@ -1,5 +1,7 @@
 import { copyFile, mkdir, readFile, rm, stat, writeFile, rename } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 import type { Env } from "../env";
 import type { ObjectStorage, SignedUrlOptions } from "./index";
@@ -55,6 +57,16 @@ export class LocalStorage implements ObjectStorage {
   async deletePrefix(prefix: string) {
     const dir = this.resolve(prefix.replace(/\/$/, ""));
     await rm(dir, { recursive: true, force: true });
+  }
+
+  async stream(key: string) {
+    const file = this.resolve(key);
+    try {
+      const s = await stat(file);
+      return { body: Readable.toWeb(createReadStream(file)) as ReadableStream<Uint8Array>, size: s.size };
+    } catch {
+      return null;
+    }
   }
 
   async signedUrl(key: string, options: SignedUrlOptions = {}) {
