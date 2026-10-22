@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { LIMITS, MB } from "@/lib/plans";
 import { enqueueAnalyze } from "@/lib/queue";
 import { serializeFile } from "@/lib/serializers";
-import { keys, storage } from "@/lib/storage";
+import { describeStorageError, keys, storage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -84,9 +84,14 @@ export const POST = route(async (req, { params }: IdParams) => {
   try {
     await storage().put(storageKey, bytes, "application/pdf");
   } catch (err) {
-    await db.sourceFile.delete({ where: { id: created.id } });
-    await refreshBatchStatus(id);
-    throw err;
+    console.error("[upload] falha ao gravar no armazenamento", storageKey, err);
+    await db.sourceFile.delete({ where: { id: created.id } }).catch(() => undefined);
+    await refreshBatchStatus(id).catch(() => undefined);
+    throw new ApiError(
+      502,
+      `Não foi possível salvar o arquivo no armazenamento (${describeStorageError(err)}). Verifique a configuração do bucket/S3 no servidor.`,
+      "STORAGE_ERROR",
+    );
   }
   const saved = await db.sourceFile.update({ where: { id: created.id }, data: { storageKey } });
 

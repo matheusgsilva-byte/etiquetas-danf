@@ -50,6 +50,18 @@ export const keys = {
   orgPrefix: (orgId: string) => `org/${orgId}/`,
 };
 
+/**
+ * Resume um erro do armazenamento em texto curto (código + status HTTP),
+ * sem expor credenciais, para mostrar ao usuário e facilitar o diagnóstico.
+ */
+export function describeStorageError(err: unknown): string {
+  const e = err as { name?: string; Code?: string; code?: string; message?: string; $metadata?: { httpStatusCode?: number } };
+  const code = e?.Code ?? e?.name ?? e?.code ?? "Erro";
+  const status = e?.$metadata?.httpStatusCode;
+  const msg = typeof e?.message === "string" ? e.message.split("\n")[0].slice(0, 160) : "";
+  return [code, status ? `HTTP ${status}` : "", msg && msg !== code ? msg : ""].filter(Boolean).join(" · ");
+}
+
 /** Garante que uma chave pertence à organização (defesa em profundidade). */
 export function assertOrgKey(orgId: string, key: string) {
   if (!key.startsWith(`org/${orgId}/`) || key.includes("..")) {

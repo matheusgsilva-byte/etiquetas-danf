@@ -57,7 +57,13 @@ export function route<C = { params: Promise<Record<string, string | string[]>> }
         return NextResponse.json({ error: err.issues[0]?.message ?? "Dados inválidos." }, { status: 400 });
       }
       console.error("[api]", req.method, new URL(req.url).pathname, err);
-      return NextResponse.json({ error: "Erro interno. Tente novamente em instantes." }, { status: 500 });
+      // Só o tipo/código do erro (sem mensagem) para ajudar no diagnóstico sem vazar detalhes.
+      const e = err as { name?: string; code?: string; Code?: string };
+      const ref = [e?.name, e?.code ?? e?.Code].filter((v) => typeof v === "string" && v && v !== "Error").join(" ");
+      return NextResponse.json(
+        { error: `Erro interno${ref ? ` (${ref})` : ""}. Tente novamente em instantes.` },
+        { status: 500 },
+      );
     }
   };
 }

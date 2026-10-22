@@ -24,6 +24,12 @@ export class S3Storage implements ObjectStorage {
       region: config.S3_REGION,
       endpoint: config.S3_ENDPOINT || undefined,
       forcePathStyle: config.S3_FORCE_PATH_STYLE,
+      // As versões recentes do SDK assinam e enviam checksums (CRC32) em todo envio.
+      // Provedores compatíveis com S3 (R2, Railway, MinIO...) recusam ou não conferem
+      // esses cabeçalhos, gerando SignatureDoesNotMatch/erros no upload. Só envia
+      // checksum quando a operação exige — comportamento idêntico na AWS.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
       credentials:
         config.S3_ACCESS_KEY_ID && config.S3_SECRET_ACCESS_KEY
           ? { accessKeyId: config.S3_ACCESS_KEY_ID, secretAccessKey: config.S3_SECRET_ACCESS_KEY }
